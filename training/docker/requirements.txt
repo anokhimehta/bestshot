@@ -1,0 +1,6 @@
+lightning
+mlflow
+timm
+opencv-python-headless
+albumentations
+pandas
