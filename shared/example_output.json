@@ -19,21 +19,21 @@
       }
     },
     {
-        "image_id": "",
-        "scores": {
-            "koniq_score": 1,
-            "sharpness": 1,
-            "exposure": 1,
-            "face_quality": 1,
-            "composite_score": 1
-        },
-        "decisions": {
-            "quality_label": "",
-            "review_flag": false,
-            "is_best_shot": true,
-            "is_burst": false,
-            "burst_group_id": null
-        }
+      "image_id": "",
+      "scores": {
+        "koniq_score": 1,
+        "sharpness": 1,
+        "exposure": 1,
+        "face_quality": 1,
+        "composite_score": 1
+      },
+      "decisions": {
+        "quality_label": "",
+        "review_flag": false,
+        "is_best_shot": true,
+        "is_burst": false,
+        "burst_group_id": null
+      }
     }
   ]
 }
