@@ -1,0 +1,26 @@
+{
+    "request_id": "req_001",
+    "user_id": "user_001",
+    "images": [
+        {
+            "image_id": "img_001",
+            "image_path": "/path/to/image1.jpg",
+            "metadata": {
+                "width": 1920,
+                "height": 1080,
+                "file_type": "jpg",
+                "timestamp": "2026-03-31T09:00:00Z"
+            }
+        },
+        {
+            "image_id": "img_002",
+            "image_path": "/path/to/image2.jpg",
+            "metadata": {
+                "width": 1920,
+                "height": 1080,
+                "file_type": "jpg",
+                "timestamp": "2026-03-31T09:01:00Z"
+            }
+        }
+    ]
+}
