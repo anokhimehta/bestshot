@@ -1,0 +1,4 @@
+Benchmark Results with dummy model
+
+Sent 100 requests
+Average latency per request: 30.38 ms

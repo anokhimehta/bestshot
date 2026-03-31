@@ -1,7 +1,7 @@
 import random
 import time
 
-# gerenating dummy model and predictions for testing purposes (output jason response)
+# gerenating dummy model and predictions for testing purposes (output json response)
 
 def load_model():
     return "dummy_model"
