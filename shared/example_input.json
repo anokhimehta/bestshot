@@ -1,0 +1,30 @@
+{
+  "request_id": "",
+  "user_id": "",
+  "images": [
+    {
+      "image_id": "",
+      "image_path": "",
+      "metadata": {
+        "width": 1,
+        "height": 1,
+        "file_type": "",
+        "timestamp": "",
+        "is_burst": false,
+        "burst_group_id": ""
+      }
+    },
+    {
+      "image_id": "",
+      "image_path": "",
+      "metadata": {
+        "width": 1,
+        "height": 1,
+        "file_type": "",
+        "timestamp": "",
+        "is_burst": false,
+        "burst_group_id": ""
+      }
+    }
+  ]
+}
