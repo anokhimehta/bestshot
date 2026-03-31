@@ -18,5 +18,10 @@ for _ in range(N_REQUESTS):
 
 end = time.time()
 
-print(f"Sent {N_REQUESTS} requests")
-print(f"Average latency per request: {(end - start)/N_REQUESTS*1000:.2f} ms")
+#print(f"Sent {N_REQUESTS} requests")
+#print(f"Average latency per request: {(end - start)/N_REQUESTS*1000:.2f} ms")
+
+with open('benchmark_results.txt', 'w') as f:
+    print("Benchmark Results with dummy model\n", file=f)
+    print(f"Sent {N_REQUESTS} requests", file=f)
+    print(f"Average latency per request: {(end - start)/N_REQUESTS*1000:.2f} ms", file=f)
