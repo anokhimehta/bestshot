@@ -1,0 +1,5 @@
+python-swiftclient
+python-keystoneclient
+python-dotenv
+requests
+numpy

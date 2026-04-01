@@ -1,0 +1,7 @@
+python-swiftclient
+python-keystoneclient
+python-dotenv
+opencv-python-headless
+numpy
+pillow
+requests
