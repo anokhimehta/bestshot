@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from model import load_model, predict_batch
 from fastapi.middleware.cors import CORSMiddleware
 
-app = FastAPI(title="Baseline Image Quality API")
+app = FastAPI(title="Baseline BestShot API")
 
 # allow all origins for testing/demo
 app.add_middleware(

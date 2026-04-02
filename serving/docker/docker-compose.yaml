@@ -1,0 +1,19 @@
+services:
+  bestshot-api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.serve
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./models:/app/models
+    
+  benchmark:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.benchmark
+    depends_on:
+      - bestshot-api
+    environment:
+      - API_URL=http://bestshot-api:8000/predict
+    command: python api_load_test.py

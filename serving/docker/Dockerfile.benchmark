@@ -1,0 +1,5 @@
+FROM python:3.11-slim
+WORKDIR /app
+RUN pip install requests numpy torch torchvision onnx onnxruntime pillow
+COPY benchmark.py scripts/api_load_test.py ./
+CMD ["python", "benchmark.py", "--mode", "cpu"]
