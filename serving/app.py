@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from model import load_model, predict_batch
+from serving.model import load_model, predict_batch
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(title="Baseline BestShot API")
@@ -12,16 +12,17 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
-# load dummy model (found in model.py)
+# load model at startup
 model = load_model()
 
-# define the endpoint for predictions
 @app.post("/predict")
 def predict(request: dict):
     images = request.get("images", [])
-    batch_outputs = predict_batch(model, images)
 
-    results = [] 
+    # pass the full image dict
+    batch_outputs = predict_batch(model, images) # predict_batch handles path extraction
+
+    results = []
     for img, output in zip(images, batch_outputs):
         results.append({
             "image_id": img.get("image_id"),
@@ -29,7 +30,6 @@ def predict(request: dict):
             "decisions": output["decisions"]
         })
 
-    # format the return to match output JSON response schema
     return {
         "request_id": request.get("request_id", ""),
         "results": results
