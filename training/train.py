@@ -78,7 +78,7 @@ def main(config):
 
     # Set up data transforms
     transform = transforms.Compose([
-        transforms.Resize((224, 224)),
+        transforms.Resize((300, 300)),
         transforms.ToTensor(),
         #using mean and standard deviation of the ImageNet dataset, computed across millions of images, per channel (R, G, B).
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
@@ -86,6 +86,8 @@ def main(config):
 
     # Load dataset
     dataset = KonIQDataset(config['data_dir'], transform=transform)
+    if config.get('limit'):
+        dataset = torch.utils.data.Subset(dataset, range(config['limit']))
     n = len(dataset)
     train_ds, validation_ds = random_split(dataset, [int(n * 0.8), n - int(n * 0.8)])
     train_loader = DataLoader(train_ds, batch_size=config['batch_size'], shuffle=True, num_workers=4)
@@ -98,7 +100,7 @@ def main(config):
         model = BestShotModel(config)
         trainer = L.Trainer(
             max_epochs=config['epochs'],
-            accelerator="gpu",
+            accelerator=config.get('accelerator', 'gpu'),  # defaults to gpu, overrideable
             devices=1
         )
         trainer.fit(model, train_loader, validation_loader)

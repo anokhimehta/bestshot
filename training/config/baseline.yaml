@@ -1,6 +1,6 @@
-# TODO: hyperparameters
+# config/baseline.yaml
 experiment_name: "baseline-bestshot-iqa"
-data_dir: "data/koniq10k"
+data_dir: "/data/koniq10k"
 batch_size: 32
 epochs: 5
 lr: 1e-4
