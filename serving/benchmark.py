@@ -2,9 +2,9 @@ import requests
 import json
 import time
 
-URL = "http://localhost:8000/predict"
+URL = "http://127.0.0.1:8000/predict"
 
-# Load example request
+'''# Load example request
 with open("testing_example_input.json") as f:
     data = json.load(f)
 
@@ -24,4 +24,61 @@ end = time.time()
 with open('benchmark_results.txt', 'w') as f:
     print("Benchmark Results with dummy model\n", file=f)
     print(f"Sent {N_REQUESTS} requests", file=f)
-    print(f"Average latency per request: {(end - start)/N_REQUESTS*1000:.2f} ms", file=f)
+    print(f"Average latency per request: {(end - start)/N_REQUESTS*1000:.2f} ms", file=f)'''
+
+
+# Load input request JSON
+with open("testing_example_input.json") as f:
+    data = json.load(f)
+
+N_REQUESTS = 20  # simulating load by sending the same 7 images 20 times
+
+latencies = []
+all_results = []
+
+for i in range(N_REQUESTS):
+    start = time.time()
+    response = requests.post(URL, json=data)
+    end = time.time()
+
+    if response.status_code != 200:
+        print(f"Request {i+1} failed with status {response.status_code}")
+        continue
+
+    latencies.append(end - start)
+    resp_json = response.json()
+    all_results.append(resp_json["results"])
+
+# flatten results for metrics
+flattened_results = [img for batch in all_results for img in batch]
+
+# compute average latency and throughput
+if len(latencies) == 0:
+    print("All requests failed. Cannot compute metrics.") # check to avoid division by zero error
+else:
+    avg_latency = sum(latencies) / len(latencies)
+    throughput = len(latencies) / sum(latencies)
+
+# compute average scores
+metric_sums = {"koniq_score": 0, "sharpness": 0, "exposure": 0, "face_quality": 0}
+for img in flattened_results:
+    for metric in metric_sums:
+        metric_sums[metric] += img["scores"].get(metric, 0)
+
+avg_metrics = {k: v / len(flattened_results) for k, v in metric_sums.items()}
+
+# save benchmark results
+with open('benchmark_results.txt', 'w') as f:
+    f.write("Benchmark Results with untrained model\n")
+    f.write(f"Sent {N_REQUESTS} requests with 7 images each\n")
+    f.write(f"Average latency per request: {avg_latency*1000:.2f} ms\n")
+    f.write(f"Throughput: {throughput:.2f} req/sec\n")
+    f.write("Average metrics per image:\n")
+    for metric, value in avg_metrics.items():
+        f.write(f"  {metric}: {value:.3f}\n")
+
+# print results to console too
+print("Benchmark finished!")
+print(f"Average latency: {avg_latency*1000:.2f} ms")
+print(f"Throughput: {throughput:.2f} req/sec")
+print("Average metrics per image:", avg_metrics)

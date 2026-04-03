@@ -4,3 +4,5 @@ config.env
 __pycache__/
 *.pyc
 .DS_Store
+.vscode/
+.vscode/settings.json.vscode/
