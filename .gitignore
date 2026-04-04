@@ -1,5 +1,9 @@
+*.env
 .env
 config.env
+secrets.yaml
+*-secret.yaml
+!*-secrets.example.yaml
 *.pem
 __pycache__/
 *.pyc

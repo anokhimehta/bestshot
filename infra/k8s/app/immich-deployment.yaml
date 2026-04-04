@@ -1,0 +1,230 @@
+# ─── Valkey (Redis replacement used by Immich) ───────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: immich-redis
+  namespace: bestshot-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: immich-redis
+  template:
+    metadata:
+      labels:
+        app: immich-redis
+    spec:
+      containers:
+      - name: redis
+        image: docker.io/valkey/valkey:9
+        ports:
+        - containerPort: 6379
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: immich-redis
+  namespace: bestshot-app
+spec:
+  selector:
+    app: immich-redis
+  ports:
+  - port: 6379
+    targetPort: 6379
+---
+# ─── Postgres ─────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: immich-postgres
+  namespace: bestshot-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: immich-postgres
+  template:
+    metadata:
+      labels:
+        app: immich-postgres
+    spec:
+      containers:
+      - name: postgres
+        image: ghcr.io/immich-app/postgres:14-vectorchord0.4.3-pgvectors0.2.0
+        env:
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: immich-db-secret
+              key: DB_PASSWORD
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: immich-db-secret
+              key: DB_USERNAME
+        - name: POSTGRES_DB
+          valueFrom:
+            secretKeyRef:
+              name: immich-db-secret
+              key: DB_DATABASE_NAME
+        - name: POSTGRES_INITDB_ARGS
+          value: "--data-checksums"
+        ports:
+        - containerPort: 5432
+        resources:
+          requests:
+            cpu: "250m"
+            memory: "512Mi"
+          limits:
+            cpu: "1000m"
+            memory: "2Gi"
+        volumeMounts:
+        - name: db-data
+          mountPath: /var/lib/postgresql/data
+      volumes:
+      - name: db-data
+        persistentVolumeClaim:
+          claimName: immich-db-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: immich-postgres
+  namespace: bestshot-app
+spec:
+  selector:
+    app: immich-postgres
+  ports:
+  - port: 5432
+    targetPort: 5432
+---
+# ─── Immich Machine Learning ──────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: immich-machine-learning
+  namespace: bestshot-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: immich-machine-learning
+  template:
+    metadata:
+      labels:
+        app: immich-machine-learning
+    spec:
+      containers:
+      - name: immich-machine-learning
+        image: ghcr.io/immich-app/immich-machine-learning:release
+        ports:
+        - containerPort: 3003
+        resources:
+          requests:
+            cpu: "500m"
+            memory: "1Gi"
+          limits:
+            cpu: "2000m"
+            memory: "4Gi"
+        volumeMounts:
+        - name: model-cache
+          mountPath: /cache
+      volumes:
+      - name: model-cache
+        persistentVolumeClaim:
+          claimName: immich-model-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: immich-machine-learning
+  namespace: bestshot-app
+spec:
+  selector:
+    app: immich-machine-learning
+  ports:
+  - port: 3003
+    targetPort: 3003
+---
+# ─── Immich Server ────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: immich-server
+  namespace: bestshot-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: immich-server
+  template:
+    metadata:
+      labels:
+        app: immich-server
+    spec:
+      containers:
+      - name: immich-server
+        image: ghcr.io/immich-app/immich-server:release
+        env:
+        - name: DB_HOSTNAME
+          value: "immich-postgres"
+        - name: DB_PORT
+          value: "5432"
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: immich-db-secret
+              key: DB_PASSWORD
+        - name: DB_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: immich-db-secret
+              key: DB_USERNAME
+        - name: DB_DATABASE_NAME
+          valueFrom:
+            secretKeyRef:
+              name: immich-db-secret
+              key: DB_DATABASE_NAME
+        - name: REDIS_HOSTNAME
+          value: "immich-redis"
+        - name: REDIS_PORT
+          value: "6379"
+        - name: IMMICH_MACHINE_LEARNING_URL
+          value: "http://immich-machine-learning:3003"
+        ports:
+        - containerPort: 2283
+        resources:
+          requests:
+            cpu: "500m"
+            memory: "512Mi"
+          limits:
+            cpu: "2000m"
+            memory: "4Gi"
+        volumeMounts:
+        - name: upload-data
+          mountPath: /usr/src/app/upload
+      volumes:
+      - name: upload-data
+        persistentVolumeClaim:
+          claimName: immich-upload-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: immich-server
+  namespace: bestshot-app
+spec:
+  selector:
+    app: immich-server
+  type: NodePort
+  ports:
+  - port: 2283
+    targetPort: 2283
+    nodePort: 30283
