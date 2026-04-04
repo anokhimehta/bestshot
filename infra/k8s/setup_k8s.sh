@@ -1,54 +1,57 @@
 #!/bin/bash
 # setup_k8s.sh
-# Run this on the master node after VMs are provisioned
-# This is your CaC — configures Kubernetes on bare Ubuntu
+# CaC script — installs and configures single-node Kubernetes
+# Run this on the Chameleon node after provisioning
+# Usage: bash infra/k8s/setup_k8s.sh
 
-set -e   # stop if any command fails
-
+set -e
 echo "======================================"
-echo " BestShot K8S Setup Script"
-echo " Project: proj19"
+echo " BestShot K8S Setup — proj19"
+echo " Single node installation"
 echo "======================================"
 
-# Step 1 - Install K3s (lightweight Kubernetes)
-echo "[1/6] Installing K3s..."
+# Step 1 — Install K3s
+echo ""
+echo "[1/5] Installing K3s (single-node Kubernetes)..."
 curl -sfL https://get.k3s.io | sh -
-sleep 30   # wait for K3s to fully start
+echo "Waiting for K3s to start..."
+sleep 30
 
-# Step 2 - Set up kubectl for cc user
-echo "[2/6] Setting up kubectl..."
+# Step 2 — Configure kubectl for cc user
+echo ""
+echo "[2/5] Configuring kubectl..."
 mkdir -p ~/.kube
 sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/config
 sudo chown cc ~/.kube/config
-echo 'export KUBECONFIG=~/.kube/config' >> ~/.bashrc
 export KUBECONFIG=~/.kube/config
+echo 'export KUBECONFIG=~/.kube/config' >> ~/.bashrc
 
-# Step 3 - Verify K8S is running
-echo "[3/6] Verifying K8S..."
+# Step 3 — Verify K8S is running
+echo ""
+echo "[3/5] Verifying Kubernetes..."
 kubectl get nodes
+echo "✅ Kubernetes is running!"
 
-# Step 4 - Install metrics server (for kubectl top)
-echo "[4/6] Installing metrics server..."
+# Step 4 — Install metrics server
+echo ""
+echo "[4/5] Installing metrics server..."
 kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+echo "✅ Metrics server installed!"
 
-# Step 5 - Mount block volume for persistent storage
-echo "[5/6] Setting up persistent storage..."
+# Step 5 — Create persistent storage directories
+echo ""
+echo "[5/5] Setting up storage directories..."
 sudo mkdir -p /mnt/block/mlflow
 sudo mkdir -p /mnt/block/immich
-
-# Mount if not already mounted
-if ! mountpoint -q /mnt/block; then
-    sudo mount /dev/vdb1 /mnt/block
-fi
-
 sudo chown -R cc /mnt/block
+echo "✅ Storage directories created!"
 
-# Step 6 - Done
-echo "[6/6] Done!"
 echo ""
-echo "Next steps:"
-echo "  kubectl apply -f k8s/platform/"
-echo "  kubectl apply -f k8s/app/"
-echo ""
-echo "MLflow will be at:  http://$(curl -s ifconfig.me):30500"
-echo "Immich will be at:  http://$(curl -s ifconfig.me):30283"
+echo "======================================"
+echo " Setup complete!"
+echo " Next steps:"
+echo "   git clone https://github.com/anokhimehta/bestshot.git"
+echo "   cd bestshot"
+echo "   kubectl apply -f infra/k8s/platform/"
+echo "   kubectl apply -f infra/k8s/app/"
+echo "======================================"

@@ -1,4 +1,4 @@
-# ─── Valkey (Redis replacement used by Immich) ───────────────────────
+# ─── Valkey (Redis) ───────────────────────────────────────────────────
 apiVersion: apps/v1
 kind: Deployment
 metadata:
