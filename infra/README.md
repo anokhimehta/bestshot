@@ -76,6 +76,6 @@ kubectl get pods -n bestshot-app
 - MLflow: http://<FLOATING_IP>:30500
 
 ## Secrets
-Secrets are never committed to git.
-See `k8s/app/immich-secrets.example.yaml` for the structure.
-Create them manually using kubectl create secret as shown in Step 6.
+Secrets are never committed to git. Create `immich-db-secret` with `kubectl create secret` as in Step 6 (`DB_PASSWORD`, `DB_USERNAME`, `DB_DATABASE_NAME`).
+
+For a local YAML template only, see `k8s/app/immich-secrets.example.yaml` (present in your working copy; listed in `.gitignore` so it is **not** pushed to GitHub).
