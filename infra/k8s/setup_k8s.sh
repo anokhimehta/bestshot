@@ -1,48 +1,55 @@
 #!/bin/bash
-# deploy.sh
-# Deploys all BestShot services in correct order
-# Usage: bash infra/k8s/deploy.sh
+# setup_k8s.sh
+# Installs K3s and configures Kubernetes on a fresh Chameleon node
+# Usage: bash infra/k8s/setup_k8s.sh
 
 set -e
 echo "======================================"
-echo " BestShot Deploy Script — proj19"
+echo " BestShot K8S Setup — proj19"
+echo " Single node installation"
 echo "======================================"
 
-cd ~/bestshot
+# Step 1 — Install K3s
+echo ""
+echo "[1/5] Installing K3s..."
+curl -sfL https://get.k3s.io | sh -
+echo "Waiting for K3s to start..."
+sleep 30
 
-# Step 1 — Create namespaces first and wait
-echo "[1/3] Creating namespaces..."
-kubectl apply -f infra/k8s/platform/00-namespace.yaml
-echo "Waiting for namespaces to be ready..."
-sleep 5
+# Step 2 — Fix kubeconfig permissions
+echo ""
+echo "[2/5] Fixing kubeconfig permissions..."
+sudo chmod 644 /etc/rancher/k3s/k3s.yaml
+mkdir -p ~/.kube
+sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/config
+sudo chown cc ~/.kube/config
+chmod 600 ~/.kube/config
+export KUBECONFIG=~/.kube/config
+echo 'export KUBECONFIG=~/.kube/config' >> ~/.bashrc
+source ~/.bashrc
 
-# Step 2 — Deploy platform (MLflow)
-echo "[2/3] Deploying platform services (MLflow)..."
-kubectl apply -f infra/k8s/platform/mlflow-pvc.yaml
-kubectl apply -f infra/k8s/platform/mlflow-deployment.yaml
-kubectl apply -f infra/k8s/platform/mlflow-service.yaml
-echo "✅ Platform services deployed!"
+# Step 3 — Verify K8S is running
+echo ""
+echo "[3/5] Verifying Kubernetes..."
+kubectl get nodes
+echo "✅ Kubernetes is running!"
 
-# Step 3 — Deploy Immich
-echo "[3/3] Deploying Immich..."
-kubectl apply -f infra/k8s/app/immich-pvc.yaml
-kubectl apply -f infra/k8s/app/immich-deployment.yaml
-echo "✅ Immich deployed!"
+# Step 4 — Install metrics server
+echo ""
+echo "[4/5] Installing metrics server..."
+kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+echo "✅ Metrics server installed!"
+
+# Step 5 — Create storage directories
+echo ""
+echo "[5/5] Setting up storage directories..."
+sudo mkdir -p /mnt/block/mlflow
+sudo mkdir -p /mnt/block/immich
+sudo chown -R cc /mnt/block
+echo "✅ Storage directories created!"
 
 echo ""
 echo "======================================"
-echo " All services deployed!"
-echo " Checking status..."
-echo "======================================"
-kubectl get pods -n bestshot-platform
-kubectl get pods -n bestshot-app
-echo "======================================"
-echo " NOTE: Before running this script,"
-echo " make sure you have created the secret:"
-echo ""
-echo " kubectl create secret generic immich-db-secret \\"
-echo "   --from-literal=DB_PASSWORD=<your_password> \\"
-echo "   --from-literal=DB_USERNAME=immich \\"
-echo "   --from-literal=DB_DATABASE_NAME=immich \\"
-echo "   -n bestshot-app"
+echo " Setup complete!"
+echo " Next: bash infra/k8s/deploy.sh"
 echo "======================================"
