@@ -2,6 +2,7 @@
 import argparse
 import yaml
 import pandas as pd
+import time
 import timm
 import torch
 import torch.nn as nn
@@ -46,9 +47,17 @@ class BestShotModel(L.LightningModule):
     def __init__(self, config):
         super().__init__()
         self.config = config
-        #use efficientnet_b3 as backbone
         self.backbone = timm.create_model('efficientnet_b3', pretrained=True, num_classes=0)
-        self.head = nn.Linear(self.backbone.num_features, 1)  # regression head
+        
+        # Freeze early stages based on config
+        frozen_stages = config.get('frozen_stages', 0)
+        stages = list(self.backbone.blocks.children())
+        for i, stage in enumerate(stages):
+            if i < frozen_stages:
+                for param in stage.parameters():
+                    param.requires_grad = False
+        
+        self.head = nn.Linear(self.backbone.num_features, 1)
 
     def forward(self, x):
         features = self.backbone(x)
@@ -103,9 +112,16 @@ def main(config):
             accelerator=config.get('accelerator', 'gpu'),  # defaults to gpu, overrideable
             devices=1
         )
+        
+        start = time.time()
         trainer.fit(model, train_loader, validation_loader)
-        mlflow.pytorch.log_model(model, "model")
-
+        mlflow.log_metric("training_time_seconds", time.time() - start)
+        
+        mlflow.pytorch.log_model(
+            model,
+            "model",
+            registered_model_name="bestshot-iqa"
+        )
 
 
 #4. Entry point
