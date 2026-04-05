@@ -90,8 +90,8 @@ def main(config):
         dataset = torch.utils.data.Subset(dataset, range(config['limit']))
     n = len(dataset)
     train_ds, validation_ds = random_split(dataset, [int(n * 0.8), n - int(n * 0.8)])
-    train_loader = DataLoader(train_ds, batch_size=config['batch_size'], shuffle=True, num_workers=4)
-    validation_loader = DataLoader(validation_ds, batch_size=config['batch_size'], shuffle=False, num_workers=4)
+    train_loader = DataLoader(train_ds, batch_size=config['batch_size'], shuffle=True, num_workers=config.get('num_workers', 4))
+    validation_loader = DataLoader(validation_ds, batch_size=config['batch_size'], shuffle=False, num_workers=config.get('num_workers', 4))
 
     mlflow.set_experiment(config['experiment_name'])
     with mlflow.start_run():

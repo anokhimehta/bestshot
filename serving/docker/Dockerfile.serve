@@ -1,10 +1,20 @@
 FROM python:3.11-slim
 
 WORKDIR /app
-COPY requirements.txt .
-RUN pip install fastapi uvicorn torch torchvision onnxruntime pillow numpy
 
-COPY app.py model.py schemas.py ./
-COPY models/ ./models/
+# install dependencies
+RUN pip install fastapi uvicorn torch torchvision \
+    onnx onnxruntime pillow numpy requests
 
+# serving code
+COPY app.py .
+COPY model.py .
+COPY benchmark.py .
+COPY testing_example_input.json .
+COPY images/ ./images/
+
+# copy config 
+COPY config/ ./config/
+
+# start the FastAPI server
 CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
