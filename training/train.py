@@ -102,21 +102,24 @@ def main(config):
     train_loader = DataLoader(train_ds, batch_size=config['batch_size'], shuffle=True, num_workers=config.get('num_workers', 4))
     validation_loader = DataLoader(validation_ds, batch_size=config['batch_size'], shuffle=False, num_workers=config.get('num_workers', 4))
 
+    mlflow.pytorch.autolog()
     mlflow.set_experiment(config['experiment_name'])
     with mlflow.start_run():
         mlflow.log_params(config)
+        mlflow.log_param("gpu_name", torch.cuda.get_device_name(0))
+        mlflow.log_param("gpu_memory_gb", round(torch.cuda.get_device_properties(0).total_memory / 1e9, 2))
 
         model = BestShotModel(config)
         trainer = L.Trainer(
             max_epochs=config['epochs'],
-            accelerator=config.get('accelerator', 'gpu'),  # defaults to gpu, overrideable
+            accelerator=config.get('accelerator', 'gpu'),
             devices=1
         )
-        
+
         start = time.time()
         trainer.fit(model, train_loader, validation_loader)
         mlflow.log_metric("training_time_seconds", time.time() - start)
-        
+
         mlflow.pytorch.log_model(
             model,
             "model",
