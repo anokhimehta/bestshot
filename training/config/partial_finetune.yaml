@@ -1,8 +1,7 @@
-#simple baseline, expect fastest to train, worst quality
 experiment_name: baseline-bestshot-iqa
 data_dir: /data/koniq10k
 batch_size: 32
 epochs: 5
 lr: 0.0001
 num_workers: 0
-frozen_stages: 7
+frozen_stages: 5
