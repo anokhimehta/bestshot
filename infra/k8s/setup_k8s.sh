@@ -1,66 +1,53 @@
 #!/bin/bash
-# setup_k8s.sh
-# CaC script — installs and configures single-node Kubernetes
-# Run this on the Chameleon node after provisioning
-# Usage: bash infra/k8s/setup_k8s.sh
+# deploy.sh
+# Deploys all BestShot services in correct order
+# Usage: bash infra/k8s/deploy.sh
 
 set -e
 echo "======================================"
-echo " BestShot K8S Setup — proj19"
-echo " Single node installation"
+echo " BestShot Deploy Script — proj19"
 echo "======================================"
 
-# Step 1 — Install K3s
-echo ""
-echo "[1/6] Installing K3s (single-node Kubernetes)..."
-curl -sfL https://get.k3s.io | sh -
-echo "Waiting for K3s to start..."
-sleep 30
+cd ~/bestshot
 
-# Step 2 — Fix kubeconfig permissions
-echo ""
-echo "[2/6] Fixing kubeconfig permissions..."
-sudo chmod 644 /etc/rancher/k3s/k3s.yaml
+# Step 1 — Create namespaces first and wait
+echo "[1/4] Creating namespaces..."
+kubectl apply -f infra/k8s/platform/namespace.yaml
+echo "Waiting for namespaces to be ready..."
+sleep 5
 
-# Step 3 — Set up kubectl for cc user
-echo ""
-echo "[3/6] Configuring kubectl for cc user..."
-mkdir -p ~/.kube
-sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/config
-sudo chown cc ~/.kube/config
-chmod 600 ~/.kube/config
-export KUBECONFIG=~/.kube/config
+# Step 2 — Deploy platform (MLflow)
+echo "[2/4] Deploying platform services (MLflow)..."
+kubectl apply -f infra/k8s/platform/mlflow-pvc.yaml
+kubectl apply -f infra/k8s/platform/mlflow-deployment.yaml
+kubectl apply -f infra/k8s/platform/mlflow-service.yaml
+echo "✅ Platform services deployed!"
 
-# Make it permanent across logins
-echo 'export KUBECONFIG=~/.kube/config' >> ~/.bashrc
-source ~/.bashrc
+# Step 3 — Create Immich secret if it doesn't exist
+echo "[3/4] Creating secrets..."
+kubectl create secret generic immich-db-secret \
+  --from-literal=DB_PASSWORD=BestShot2024! \
+  --from-literal=DB_USERNAME=immich \
+  --from-literal=DB_DATABASE_NAME=immich \
+  -n bestshot-app \
+  --dry-run=client -o yaml | kubectl apply -f -
+echo "✅ Secrets created!"
 
-# Step 4 — Verify K8S is running
-echo ""
-echo "[4/6] Verifying Kubernetes..."
-kubectl get nodes
-echo "✅ Kubernetes is running!"
-
-# Step 5 — Install metrics server
-echo ""
-echo "[5/6] Installing metrics server..."
-kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
-echo "✅ Metrics server installed!"
-
-# Step 6 — Create persistent storage directories
-echo ""
-echo "[6/6] Setting up storage directories..."
-sudo mkdir -p /mnt/block/mlflow
-sudo mkdir -p /mnt/block/immich
-sudo chown -R cc /mnt/block
-echo "✅ Storage directories created!"
+# Step 4 — Deploy Immich
+echo "[4/4] Deploying Immich..."
+kubectl apply -f infra/k8s/app/immich-pvc.yaml
+kubectl apply -f infra/k8s/app/immich-deployment.yaml
+echo "✅ Immich deployed!"
 
 echo ""
 echo "======================================"
-echo " Setup complete!"
-echo " Next steps:"
-echo "   git clone https://github.com/anokhimehta/bestshot.git"
-echo "   cd bestshot"
-echo "   kubectl apply -f infra/k8s/platform/"
-echo "   kubectl apply -f infra/k8s/app/"
+echo " All services deployed!"
+echo " Checking status..."
+echo "======================================"
+kubectl get pods -n bestshot-platform
+kubectl get pods -n bestshot-app
+
+echo ""
+echo " MLflow: http://$(curl -s ifconfig.me 2>/dev/null):30500"
+echo " Immich:  http://$(curl -s ifconfig.me 2>/dev/null):30283"
 echo "======================================"
