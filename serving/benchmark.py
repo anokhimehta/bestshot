@@ -8,9 +8,12 @@ URL = "http://127.0.0.1:8000/predict"
 with open("testing_example_input.json") as f:
     data = json.load(f)
 
-N_USERS = 100
-UPLOADS_PER_USER = 20
-N_REQUESTS = N_USERS * UPLOADS_PER_USER  # 2000 requests (simulating 100 users uploading 20 images each sequentially, also used the same 7 photos)
+from config import CONFIG
+
+URL = CONFIG["url"]
+N_USERS = CONFIG["num_users"]
+UPLOADS_PER_USER = CONFIG["uploads_per_user"]
+N_REQUESTS = N_USERS * UPLOADS_PER_USER
 
 latencies = []
 all_results = []
@@ -57,8 +60,8 @@ with open('benchmark_results.txt', 'w') as f:
         f.write(f"  {metric}: {value:.3f}\n")
 
 # print results to console too
-print("CPU onlyBenchmark finished!\n")
-
+print("Benchmark finished!\n")
+print(f"Ran config: {CONFIG}\n")
 print(f"Average latency: {avg_latency*1000:.2f} ms")
 print(f"Throughput: {throughput:.2f} req/sec")
 print("Average metrics per image:", avg_metrics, "\n")
