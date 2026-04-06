@@ -1,38 +1,38 @@
 {
-  "request_id": "1",
+  "request_id": "req_20260401_abc123",
   "results": [
     {
-      "image_id": "",
+      "image_id": "abc123",
       "scores": {
-        "koniq_score": 1,
-        "sharpness": 1,
-        "exposure": 1,
-        "face_quality": 1,
-        "composite_score": 1
+        "koniq_score": 7.4,
+        "sharpness": 0.82,
+        "exposure": 0.91,
+        "face_quality": 0.95,
+        "composite_score": 7.8
       },
       "decisions": {
-        "quality_label": "",
+        "quality_label": "high",
         "review_flag": false,
         "is_best_shot": true,
-        "is_burst": false,
-        "burst_group_id": null
+        "is_burst": true,
+        "burst_group_id": "burst_007"
       }
     },
     {
-      "image_id": "",
+      "image_id": "abc124",
       "scores": {
-        "koniq_score": 1,
-        "sharpness": 1,
-        "exposure": 1,
-        "face_quality": 1,
-        "composite_score": 1
+        "koniq_score": 2.1,
+        "sharpness": 0.12,
+        "exposure": 0.45,
+        "face_quality": 0.60,
+        "composite_score": 2.3
       },
       "decisions": {
-        "quality_label": "",
-        "review_flag": false,
-        "is_best_shot": true,
-        "is_burst": false,
-        "burst_group_id": null
+        "quality_label": "low",
+        "review_flag": true,
+        "is_best_shot": false,
+        "is_burst": true,
+        "burst_group_id": "burst_007"
       }
     }
   ]
