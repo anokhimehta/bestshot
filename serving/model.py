@@ -25,13 +25,14 @@ class Model:
             if not os.path.exists(path):
                 raise FileNotFoundError(f"Image not found: {path}")
             img = Image.open(path).convert("RGB")
-            img = self.transform(img).to(self.device)
+            img = self.transform(img).to(self.device) # Move image tensor to GPU
             images.append(img)
         return torch.stack(images)
 
     def predict(self, image_paths):
-        x = self.load_images(image_paths)
+        x = self.load_images(image_paths) # Load and preprocess images, move to GPU
         with torch.no_grad():
+            _ = self.model(x) # Math happens on AMD compute units 
             _ = self.model(x) # we ignore the actual output since this is a dummy model, we just want to simulate the latency and return random scores
 
         results = []

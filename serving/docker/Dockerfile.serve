@@ -1,4 +1,5 @@
 FROM python:3.11-slim
+FROM rocm/pytorch:rocm6.3.3-py3.12-ubuntu24.04
 
 WORKDIR /app
 
