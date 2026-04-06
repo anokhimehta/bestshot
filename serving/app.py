@@ -1,7 +1,11 @@
 from fastapi import FastAPI
-from serving.model import load_model, predict_batch
 from fastapi.middleware.cors import CORSMiddleware
+try:
+    from serving.model import load_model, predict_batch  # local
+except ModuleNotFoundError:
+    from model import load_model, predict_batch          # docker
 
+    
 app = FastAPI(title="Baseline BestShot API")
 
 # allow all origins for testing/demo
