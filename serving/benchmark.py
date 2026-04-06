@@ -2,6 +2,7 @@ import requests
 import json
 import time
 import threading
+from concurrent.futures import ThreadPoolExecutor
 
 # load input request json
 with open("testing_example_input.json") as f:
@@ -16,10 +17,9 @@ UPLOADS_PER_USER = CONFIG["uploads_per_user"]
 MAX_WORKERS = CONFIG["max_workers"]
 N_REQUESTS = N_USERS * UPLOADS_PER_USER
 
-# request functions
+# functions to run benchmarks in different modes -------------------------------------------------------------------
 
-def run_sequential(n_requests):
-    """one request at a time"""
+def run_sequential(n_requests): # multiple users sending requests one after another
     latencies = []
     all_results = []
 
@@ -38,29 +38,37 @@ def run_sequential(n_requests):
     return latencies, all_results
 
 
-def run_concurrent(num_users, uploads_per_user):
-    """multiple users sending requests simultaneously"""
+def run_concurrent(num_users, uploads_per_user): # multiple users sending requests simultaneously using ThreadPoolExecutor for better thread management
     all_latencies = []
     all_results = []
     lock = threading.Lock()
 
     def worker():
-        for _ in range(uploads_per_user):
-            start = time.time()
-            response = requests.post(URL, json=data)
-            end = time.time()
-            with lock:
-                if response.status_code == 200:
-                    all_latencies.append(end - start)
-                    all_results.append(response.json()["results"])
+        # Session reuses the same TCP connection for all uploads from this 'user'
+        with requests.Session() as session:
+            for _ in range(uploads_per_user):
+                start = time.time()
+                try:
+                    response = session.post(URL, json=data)
+                    end = time.time()
+                    
+                    if response.status_code == 200:
+                        with lock:
+                            all_latencies.append(end - start)
+                            all_results.append(response.json()["results"])
+                    else:
+                        print(f"Request failed: {response.status_code}")
+                except Exception as e:
+                    print(f"Network error: {e}")
 
-    threads = [threading.Thread(target=worker) for _ in range(num_users)]
-    for t in threads: t.start()
-    for t in threads: t.join()
+    # This replaces the manual threading.Thread(target=worker) list
+    with ThreadPoolExecutor(max_workers=num_users) as executor:
+        for _ in range(num_users):
+            executor.submit(worker)
 
     return all_latencies, all_results
 
-# run the right mode based on config
+# run the right mode based on config -------------------------------------------------------------------
 
 if MAX_WORKERS == 1:
     print(f"Running sequential benchmark ({N_REQUESTS} total requests)...")
@@ -69,7 +77,7 @@ else:
     print(f"Running concurrent benchmark ({N_USERS} users x {UPLOADS_PER_USER} requests)...")
     latencies, all_results = run_concurrent(N_USERS, UPLOADS_PER_USER)
 
-# compute metrics 
+# compute metrics ------------------------------------------------------------------------------------
 
 flattened_results = [img for batch in all_results for img in batch]
 
@@ -91,7 +99,7 @@ else:
 
     avg_metrics = {k: v / len(flattened_results) for k, v in metric_sums.items()}
 
-    # save results to a text file for later analysis
+    # save results to a text file for later analysis -----------------------------------------------------------
 
     with open("benchmark_results.txt", "w") as f:
         f.write(f"------ Benchmark results for config: {CONFIG['mode']} ------\n")
@@ -106,7 +114,7 @@ else:
         for metric, value in avg_metrics.items():
             f.write(f"  {metric}: {value:.3f}\n")
 
-    # print results to terminal output
+    # print results to terminal output -----------------------------------------------------------------------
 
     print("\nBenchmark finished!")
     print(f"Config: {CONFIG['mode']} | Workers: {MAX_WORKERS}")

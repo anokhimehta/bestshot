@@ -7,7 +7,11 @@ import os
 
 class Model:
     def __init__(self):
+        # Determine device: use CUDA if available
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu") # Determine device: use CUDA if available
+        
         self.model = models.efficientnet_b3(weights=None)
+        self.model.to(self.device)  # Move model to GPU
         self.model.eval()
         # preprocessing
         self.transform = transforms.Compose([
@@ -21,14 +25,14 @@ class Model:
             if not os.path.exists(path):
                 raise FileNotFoundError(f"Image not found: {path}")
             img = Image.open(path).convert("RGB")
-            img = self.transform(img)
+            img = self.transform(img).to(self.device)
             images.append(img)
         return torch.stack(images)
 
     def predict(self, image_paths):
         x = self.load_images(image_paths)
         with torch.no_grad():
-            _ = self.model(x)
+            _ = self.model(x) # we ignore the actual output since this is a dummy model, we just want to simulate the latency and return random scores
 
         results = []
         for i in range(len(image_paths)):
