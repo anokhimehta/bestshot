@@ -1,0 +1,21 @@
+# K8S manifest for Anurag's ingestion container
+# Dockerfile: https://github.com/anokhimehta/bestshot/blob/main/data/ingestion/Dockerfile
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: bestshot-ingestion
+  namespace: bestshot-platform
+spec:
+  template:
+    spec:
+      containers:
+      - name: ingestion
+        image: bestshot-ingestion:latest
+        resources:
+          requests:
+            cpu: "250m"
+            memory: "512Mi"
+          limits:
+            cpu: "1000m"
+            memory: "2Gi"
+      restartPolicy: Never

@@ -1,0 +1,41 @@
+# K8S manifest for Anurag's feature service container
+# Dockerfile: https://github.com/anokhimehta/bestshot/blob/main/data/features/Dockerfile
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bestshot-features
+  namespace: bestshot-platform
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: bestshot-features
+  template:
+    metadata:
+      labels:
+        app: bestshot-features
+    spec:
+      containers:
+      - name: features
+        image: bestshot-features:latest
+        ports:
+        - containerPort: 8000
+        resources:
+          requests:
+            cpu: "250m"
+            memory: "512Mi"
+          limits:
+            cpu: "1000m"
+            memory: "2Gi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: bestshot-features
+  namespace: bestshot-platform
+spec:
+  selector:
+    app: bestshot-features
+  ports:
+  - port: 8000
+    targetPort: 8000
