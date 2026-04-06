@@ -4,7 +4,7 @@
     "images": [
         {
             "image_id": "img_1",
-            "image_path": "serving/images/img1.jpg",
+            "image_path": "images/img1.jpg",
             "metadata": {
                 "width": 1920,
                 "height": 1080,
@@ -14,7 +14,7 @@
         },
         {
             "image_id": "img_2",
-            "image_path": "serving/images/img2.jpg",
+            "image_path": "images/img2.jpg",
             "metadata": {
                 "width": 1920,
                 "height": 1080,
@@ -24,7 +24,7 @@
         },
         {
             "image_id": "img_3",
-            "image_path": "serving/images/img3.jpg",
+            "image_path": "images/img3.jpg",
             "metadata": {
                 "width": 1920,
                 "height": 1080,
@@ -34,7 +34,7 @@
         },
         {
             "image_id": "img_4",
-            "image_path": "serving/images/img4.jpg",
+            "image_path": "images/img4.jpg",
             "metadata": {
                 "width": 1920,
                 "height": 1080,
@@ -44,7 +44,7 @@
         },
         {
             "image_id": "img_5",
-            "image_path": "serving/images/img5.jpg",
+            "image_path": "images/img5.jpg",
             "metadata": {
                 "width": 1920,
                 "height": 1080,
@@ -54,7 +54,7 @@
         },
         {
             "image_id": "img_6",
-            "image_path": "serving/images/img6.jpg",
+            "image_path": "images/img6.jpg",
             "metadata": {
                 "width": 1920,
                 "height": 1080,
@@ -64,7 +64,7 @@
         },
          {
             "image_id": "img_7",
-            "image_path": "serving/images/img7.jpg",
+            "image_path": "images/img7.jpg",
             "metadata": {
                 "width": 1920,
                 "height": 1080,
