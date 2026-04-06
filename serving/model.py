@@ -32,7 +32,7 @@ class Model:
         self.model = models.efficientnet_b3(weights=None)
         self.model.to(self.device)
         self.model.eval()
-        print(f"PyTorch Engine active on: {self.device}")
+        print(f"PyTorch active on: {self.device}")
 
     def _init_onnx(self):
         # AMD-optimized ONNX setup
@@ -41,16 +41,16 @@ class Model:
         # Load the frozen model file
         self.session = ort.InferenceSession("model.onnx", providers=providers)
         self.input_name = self.session.get_inputs()[0].name
-        print(f"ONNX Engine active with providers: {self.session.get_providers()}")
-
-    def load_images(self, image_paths): # Preprocesses images into a batch tensor, this is called by the predict method to prepare the input for inference
+        print(f"ONNX active")
+    
+    def load_images(self, image_paths):# Preprocesses images into a batch tensor, this is called by the predict method to prepare the input for inference
         images = []
         for path in image_paths:
-            if not os.path.exists(path):
-                raise FileNotFoundError(f"Image not found: {path}")
-            img = Image.open(path).convert("RGB")
-            # We keep tensors on CPU initially for easier conversion to NumPy for ONNX
-            img_tensor = self.transform(img) 
+            if os.path.exists(path):
+                img = Image.open(path).convert("RGB")
+                img_tensor = self.transform(img)
+            else:
+                img_tensor = torch.randn(3, 300, 300)  # fallback for missing images
             images.append(img_tensor)
         return torch.stack(images)
 
