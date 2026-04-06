@@ -6,11 +6,11 @@ import os
 import random
 import numpy as np
 import onnxruntime as ort
-from config import CONFIG 
 
 class Model:
     def __init__(self):
         # Pull model type and device from config to determine which inference engine to initialize
+        from config import CONFIG 
         self.model_type = CONFIG.get("model_type", "pytorch")
         self.device_type = CONFIG.get("device", "cpu")
         
