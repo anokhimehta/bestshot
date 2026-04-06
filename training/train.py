@@ -1,7 +1,7 @@
-# TODO: main training entrypoint
 import argparse
 import yaml
 import pandas as pd
+import subprocess
 import time
 import timm
 import torch
@@ -20,6 +20,15 @@ BestShot train.py
 Usage: python train.py --config config/baseline.yaml
 """
 
+class EpochTimingCallback(L.Callback):
+    def on_train_epoch_start(self, trainer, pl_module):
+        self._epoch_start = time.time()
+    
+    def on_train_epoch_end(self, trainer, pl_module):
+        epoch_time = time.time() - self._epoch_start
+        pl_module.log("time_per_epoch_seconds", epoch_time)
+        
+        
 #1. Dataset loading and preprocessing
 class KonIQDataset(Dataset):
     def __init__(self, data_dir, transform=None):
@@ -108,17 +117,23 @@ def main(config):
         mlflow.log_params(config)
         mlflow.log_param("gpu_name", torch.cuda.get_device_name(0))
         mlflow.log_param("gpu_memory_gb", round(torch.cuda.get_device_properties(0).total_memory / 1e9, 2))
+        
+        # git SHA
+        git_sha = subprocess.check_output(["git", "rev-parse", "--short", "HEAD"]).decode().strip()
+        mlflow.log_param("git_sha", git_sha)
 
         model = BestShotModel(config)
         trainer = L.Trainer(
             max_epochs=config['epochs'],
             accelerator=config.get('accelerator', 'gpu'),
-            devices=1
+            devices=1,
+            callbacks=[EpochTimingCallback()]
         )
 
         start = time.time()
         trainer.fit(model, train_loader, validation_loader)
         mlflow.log_metric("training_time_seconds", time.time() - start)
+        mlflow.log_param("peak_vram_gb", round(torch.cuda.max_memory_allocated(0) / 1e9, 2))
 
         mlflow.pytorch.log_model(
             model,
