@@ -61,8 +61,9 @@ def run_concurrent(num_users, uploads_per_user): # multiple users sending reques
                 except Exception as e:
                     print(f"Network error: {e}")
 
-    # This replaces the manual threading.Thread(target=worker) list
-    with ThreadPoolExecutor(max_workers=num_users) as executor:
+    # Replace the manual threading.Thread(target=worker) list with ThreadPoolExecutor for better thread management and performance
+    # max_workers controls how many threads run concurrently, simulating the number of users sending requests at the same time
+    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
         for _ in range(num_users):
             executor.submit(worker)
 
