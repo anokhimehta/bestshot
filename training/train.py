@@ -119,7 +119,10 @@ def main(config):
         mlflow.log_param("gpu_memory_gb", round(torch.cuda.get_device_properties(0).total_memory / 1e9, 2))
         
         # git SHA
-        git_sha = subprocess.check_output(["git", "rev-parse", "--short", "HEAD"]).decode().strip()
+        try:
+            git_sha = subprocess.check_output(["git", "rev-parse", "--short", "HEAD"]).decode().strip()
+        except subprocess.CalledProcessError:
+            git_sha = "unknown"
         mlflow.log_param("git_sha", git_sha)
 
         model = BestShotModel(config)
