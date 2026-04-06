@@ -1,3 +1,4 @@
+#run to make sure everything working in chameleon environment
 experiment_name: chameleon-test
 data_dir: /data/koniq10k
 batch_size: 32

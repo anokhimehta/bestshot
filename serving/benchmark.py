@@ -1,84 +1,127 @@
 import requests
 import json
 import time
+import threading
+from concurrent.futures import ThreadPoolExecutor
 
-URL = "http://127.0.0.1:8000/predict"
-
-'''# Load example request
+# load input request json
 with open("testing_example_input.json") as f:
     data = json.load(f)
 
-N_REQUESTS = 100  # number of requests to simulate
+# load config
+from config import CONFIG
 
-start = time.time()
+URL = CONFIG["url"]
+N_USERS = CONFIG["num_users"]
+UPLOADS_PER_USER = CONFIG["uploads_per_user"]
+MAX_WORKERS = CONFIG["max_workers"]
+N_REQUESTS = N_USERS * UPLOADS_PER_USER
 
-for _ in range(N_REQUESTS):
-    response = requests.post(URL, json=data)
-    assert response.status_code == 200
+# functions to run benchmarks in different modes -------------------------------------------------------------------
 
-end = time.time()
+def run_sequential(n_requests): # multiple users sending requests one after another
+    latencies = []
+    all_results = []
 
-#print(f"Sent {N_REQUESTS} requests")
-#print(f"Average latency per request: {(end - start)/N_REQUESTS*1000:.2f} ms")
+    for i in range(n_requests):
+        start = time.time()
+        response = requests.post(URL, json=data)
+        end = time.time()
 
-with open('benchmark_results.txt', 'w') as f:
-    print("Benchmark Results with dummy model\n", file=f)
-    print(f"Sent {N_REQUESTS} requests", file=f)
-    print(f"Average latency per request: {(end - start)/N_REQUESTS*1000:.2f} ms", file=f)'''
+        if response.status_code != 200:
+            print(f"Request {i+1} failed with status {response.status_code}")
+            continue
+
+        latencies.append(end - start)
+        all_results.append(response.json()["results"])
+
+    return latencies, all_results
 
 
-# Load input request JSON
-with open("testing_example_input.json") as f:
-    data = json.load(f)
+def run_concurrent(num_users, uploads_per_user): # multiple users sending requests simultaneously using ThreadPoolExecutor for better thread management
+    all_latencies = []
+    all_results = []
+    lock = threading.Lock()
 
-N_REQUESTS = 20  # simulating load by sending the same 7 images 20 times
+    def worker():
+        # Session reuses the same TCP connection for all uploads from this 'user'
+        with requests.Session() as session:
+            for _ in range(uploads_per_user):
+                start = time.time()
+                try:
+                    response = session.post(URL, json=data)
+                    end = time.time()
+                    
+                    if response.status_code == 200:
+                        with lock:
+                            all_latencies.append(end - start)
+                            all_results.append(response.json()["results"])
+                    else:
+                        print(f"Request failed: {response.status_code}")
+                except Exception as e:
+                    print(f"Network error: {e}")
 
-latencies = []
-all_results = []
+    # This replaces the manual threading.Thread(target=worker) list
+    with ThreadPoolExecutor(max_workers=num_users) as executor:
+        for _ in range(num_users):
+            executor.submit(worker)
 
-for i in range(N_REQUESTS):
-    start = time.time()
-    response = requests.post(URL, json=data)
-    end = time.time()
+    return all_latencies, all_results
 
-    if response.status_code != 200:
-        print(f"Request {i+1} failed with status {response.status_code}")
-        continue
+# run the right mode based on config -------------------------------------------------------------------
 
-    latencies.append(end - start)
-    resp_json = response.json()
-    all_results.append(resp_json["results"])
+if MAX_WORKERS == 1:
+    print(f"Running sequential benchmark ({N_REQUESTS} total requests)...")
+    latencies, all_results = run_sequential(N_REQUESTS)
+else:
+    print(f"Running concurrent benchmark ({N_USERS} users x {UPLOADS_PER_USER} requests)...")
+    latencies, all_results = run_concurrent(N_USERS, UPLOADS_PER_USER)
 
-# flatten results for metrics
+# compute metrics ------------------------------------------------------------------------------------
+
 flattened_results = [img for batch in all_results for img in batch]
 
-# compute average latency and throughput
 if len(latencies) == 0:
-    print("All requests failed. Cannot compute metrics.") # check to avoid division by zero error
+    print("All requests failed. Cannot compute metrics.")
 else:
     avg_latency = sum(latencies) / len(latencies)
     throughput = len(latencies) / sum(latencies)
 
-# compute average scores
-metric_sums = {"koniq_score": 0, "sharpness": 0, "exposure": 0, "face_quality": 0}
-for img in flattened_results:
-    for metric in metric_sums:
-        metric_sums[metric] += img["scores"].get(metric, 0)
+    import numpy as np
+    p50 = np.percentile(latencies, 50) * 1000
+    p95 = np.percentile(latencies, 95) * 1000
+    p99 = np.percentile(latencies, 99) * 1000
 
-avg_metrics = {k: v / len(flattened_results) for k, v in metric_sums.items()}
+    metric_sums = {"koniq_score": 0, "sharpness": 0, "exposure": 0, "face_quality": 0}
+    for img in flattened_results:
+        for metric in metric_sums:
+            metric_sums[metric] += img["scores"].get(metric, 0)
 
-# save benchmark results
-with open('benchmark_results.txt', 'w') as f:
-    f.write("Benchmark Results with untrained model\n")
-    f.write(f"Sent {N_REQUESTS} requests with 7 images each\n")
-    f.write(f"Average latency per request: {avg_latency*1000:.2f} ms\n")
-    f.write(f"Throughput: {throughput:.2f} req/sec\n")
-    f.write("Average metrics per image:\n")
-    for metric, value in avg_metrics.items():
-        f.write(f"  {metric}: {value:.3f}\n")
+    avg_metrics = {k: v / len(flattened_results) for k, v in metric_sums.items()}
 
-# print results to console too
-print("Benchmark finished!")
-print(f"Average latency: {avg_latency*1000:.2f} ms")
-print(f"Throughput: {throughput:.2f} req/sec")
-print("Average metrics per image:", avg_metrics)
+    # save results to a text file for later analysis -----------------------------------------------------------
+
+    with open("benchmark_results.txt", "w") as f:
+        f.write(f"------ Benchmark results for config: {CONFIG['mode']} ------\n")
+        f.write(f"Users: {N_USERS}, Requests per user: {UPLOADS_PER_USER}, Workers: {MAX_WORKERS}\n")
+        f.write(f"Total successful requests: {len(latencies)}/{N_REQUESTS}\n")
+        f.write(f"Average latency: {avg_latency*1000:.2f} ms\n")
+        f.write(f"Latency p50: {p50:.2f} ms\n")
+        f.write(f"Latency p95: {p95:.2f} ms\n")
+        f.write(f"Latency p99: {p99:.2f} ms\n")
+        f.write(f"Throughput: {throughput:.2f} req/sec\n")
+        f.write("Average metrics per image:\n")
+        for metric, value in avg_metrics.items():
+            f.write(f"  {metric}: {value:.3f}\n")
+
+    # print results to terminal output -----------------------------------------------------------------------
+
+    print("\nBenchmark finished!")
+    print(f"Config: {CONFIG['mode']} | Workers: {MAX_WORKERS}")
+    print(f"Total requests: {len(latencies)}/{N_REQUESTS} succeeded")
+    print(f"Average latency : {avg_latency*1000:.2f} ms")
+    print(f"Latency p50     : {p50:.2f} ms")
+    print(f"Latency p95     : {p95:.2f} ms")
+    print(f"Latency p99     : {p99:.2f} ms")
+    print(f"Throughput      : {throughput:.2f} req/sec")
+    print(f"Avg metrics     : {avg_metrics}")
