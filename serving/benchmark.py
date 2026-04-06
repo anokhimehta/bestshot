@@ -51,8 +51,8 @@ avg_metrics = {k: v / len(flattened_results) for k, v in metric_sums.items()}
 
 # save benchmark results
 with open('benchmark_results.txt', 'w') as f:
-    f.write("------ Benchmark results with untrained model on cpu ------\n")
-    f.write(f"Sent {N_REQUESTS} requests with 7 images each\n")
+    f.write(f"------ Benchmark results for config: {CONFIG['mode']} ------\n")
+    f.write(f"Sent {N_REQUESTS} requests\n")
     f.write(f"Average latency per request: {avg_latency*1000:.2f} ms\n")
     f.write(f"Throughput: {throughput:.2f} req/sec\n")
     f.write("Average metrics per image:\n")
