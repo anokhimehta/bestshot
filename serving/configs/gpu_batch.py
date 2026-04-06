@@ -2,8 +2,8 @@ CONFIG = {
     "mode": "concurrent",
     "device": "gpu",
     "model_type": "pytorch",
-    "num_users": 10,
+    "num_users": 100,
     "uploads_per_user": 20,
-    "max_workers": 10,
+    "max_workers": 50,
     "url": "http://127.0.0.1:8000/predict",
 }
