@@ -4,34 +4,13 @@ import time
 
 URL = "http://127.0.0.1:8000/predict"
 
-'''# Load example request
-with open("testing_example_input.json") as f:
-    data = json.load(f)
-
-N_REQUESTS = 100  # number of requests to simulate
-
-start = time.time()
-
-for _ in range(N_REQUESTS):
-    response = requests.post(URL, json=data)
-    assert response.status_code == 200
-
-end = time.time()
-
-#print(f"Sent {N_REQUESTS} requests")
-#print(f"Average latency per request: {(end - start)/N_REQUESTS*1000:.2f} ms")
-
-with open('benchmark_results.txt', 'w') as f:
-    print("Benchmark Results with dummy model\n", file=f)
-    print(f"Sent {N_REQUESTS} requests", file=f)
-    print(f"Average latency per request: {(end - start)/N_REQUESTS*1000:.2f} ms", file=f)'''
-
-
 # Load input request JSON
 with open("testing_example_input.json") as f:
     data = json.load(f)
 
-N_REQUESTS = 20  # simulating load by sending the same 7 images 20 times
+N_USERS = 100
+UPLOADS_PER_USER = 20
+N_REQUESTS = N_USERS * UPLOADS_PER_USER  # 2000 requests (simulating 100 users uploading 20 images each sequentially, also used the same 7 photos)
 
 latencies = []
 all_results = []
@@ -69,7 +48,7 @@ avg_metrics = {k: v / len(flattened_results) for k, v in metric_sums.items()}
 
 # save benchmark results
 with open('benchmark_results.txt', 'w') as f:
-    f.write("Benchmark Results with untrained model\n")
+    f.write("------ Benchmark results with untrained model on cpu ------\n")
     f.write(f"Sent {N_REQUESTS} requests with 7 images each\n")
     f.write(f"Average latency per request: {avg_latency*1000:.2f} ms\n")
     f.write(f"Throughput: {throughput:.2f} req/sec\n")
@@ -78,7 +57,8 @@ with open('benchmark_results.txt', 'w') as f:
         f.write(f"  {metric}: {value:.3f}\n")
 
 # print results to console too
-print("Benchmark finished!")
+print("CPU onlyBenchmark finished!\n")
+
 print(f"Average latency: {avg_latency*1000:.2f} ms")
 print(f"Throughput: {throughput:.2f} req/sec")
-print("Average metrics per image:", avg_metrics)
+print("Average metrics per image:", avg_metrics, "\n")
