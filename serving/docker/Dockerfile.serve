@@ -1,32 +1,22 @@
-# Use ROCm base image for AMD MI100 support
 FROM rocm/pytorch:rocm6.3.3_ubuntu24.04_py3.12_pytorch_release_2.4.0
 
 WORKDIR /app
 
-# Install the extra dependencies and remove torch and torchvision because they are pre-installed in the base image
 RUN pip install --no-cache-dir \
     fastapi \
     uvicorn \
     onnx \
-    onnxruntime-rocm \
     pillow \
     numpy \
     requests
 
-# Copy serving and benchmark files
 COPY app.py .
 COPY model.py .
 COPY benchmark.py .
 COPY testing_example_input.json .
 COPY config.py .
-
-# Copy model onnx
 COPY model.onnx .
-
-# Copy directories
 COPY images/ ./images/
 COPY configs/ ./configs/
-COPY config/ ./config/
 
-# Start the FastAPI server
 CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
