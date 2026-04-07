@@ -8,7 +8,9 @@ RUN pip install --no-cache-dir \
     onnx \
     pillow \
     numpy \
-    requests
+    requests \
+    onnxruntime-rocm \
+    --index-url https://download.pytorch.org/whl/rocm6.3
 
 COPY app.py .
 COPY model.py .
