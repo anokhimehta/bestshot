@@ -1,4 +1,4 @@
-experiment_name: "partial-finetune-bestshot-iqa"
+experiment_name: "partial-finetune-highlr-bestshot-iqa"
 data_dir: /data/koniq10k
 batch_size: 32
 epochs: 5
