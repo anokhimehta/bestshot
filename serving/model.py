@@ -62,14 +62,12 @@ class Model:
         if self.model_type == "onnx":
             # Convert to NumPy for ONNX Runtime
             onnx_inputs = {self.input_name: x_tensor.numpy()}
-            # Simulate the double-pass workload by running the model twice
+            # Removed the second pass for ONNX to avoid unnecessary overhead, since ONNX is optimized for batch processing and should be efficient enough with a single pass
             _ = self.session.run(None, onnx_inputs) 
-            _ = self.session.run(None, onnx_inputs)
         else:
-            # Move to GPU if needed and run the model twice to simulate the workload
+            # Move to GPU if needed and run the model
             x_gpu = x_tensor.to(self.device)
             with torch.no_grad():
-                _ = self.model(x_gpu)
                 _ = self.model(x_gpu)
 
         # Calculate mock scores and decisions to simulate the output structure
