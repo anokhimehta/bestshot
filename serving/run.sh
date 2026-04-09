@@ -24,7 +24,7 @@ fi
 
 echo "======================================"
 echo "  Running config: $CONFIG_NAME"
-echo "======================================"
+echo "======================================\\n"
 
 # clean up old container
 docker rm -f bestshot-api 2>/dev/null
@@ -44,7 +44,7 @@ until curl -s http://127.0.0.1:8000/docs > /dev/null; do
     sleep 2
     echo "  still waiting..."
 done
-echo "Server ready!"
+echo "Server ready!\\n"
 
 # resource snapshot
 echo ""
@@ -59,7 +59,7 @@ docker run --rm --network host \
   $GPU_FLAGS \
   -e CONFIG_NAME=$CONFIG_NAME \
   bestshot-serve \
-  sh -c "python benchmark.py && cat benchmark_results.txt"
+  sh -c "python benchmark.py"
 
 # stop server
 docker stop bestshot-api

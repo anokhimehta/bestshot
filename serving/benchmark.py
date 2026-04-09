@@ -17,6 +17,8 @@ UPLOADS_PER_USER = CONFIG["uploads_per_user"]
 MAX_WORKERS = CONFIG["max_workers"]
 N_REQUESTS = N_USERS * UPLOADS_PER_USER
 
+start_total = time.time()
+
 # functions to run benchmarks in different modes -------------------------------------------------------------------
 
 def run_sequential(n_requests): # multiple users sending requests one after another
@@ -78,6 +80,7 @@ else:
     print(f"Running concurrent benchmark ({N_USERS} users x {UPLOADS_PER_USER} requests)...")
     latencies, all_results = run_concurrent(N_USERS, UPLOADS_PER_USER)
 
+total_time = time.time() - start_total
 # compute metrics ------------------------------------------------------------------------------------
 
 flattened_results = [img for batch in all_results for img in batch]
@@ -106,6 +109,7 @@ else:
         f.write(f"------ Benchmark results for config: {CONFIG['mode']} ------\n")
         f.write(f"Users: {N_USERS}, Requests per user: {UPLOADS_PER_USER}, Workers: {MAX_WORKERS}\n")
         f.write(f"Total successful requests: {len(latencies)}/{N_REQUESTS}\n")
+        f.write(f"Total benchmark time: {total_time:.1f} seconds\n")
         f.write(f"Average latency: {avg_latency*1000:.2f} ms\n")
         f.write(f"Latency p50: {p50:.2f} ms\n")
         f.write(f"Latency p95: {p95:.2f} ms\n")
@@ -120,6 +124,7 @@ else:
     print("\nBenchmark finished!")
     print(f"Config: {CONFIG['mode']} | Workers: {MAX_WORKERS}")
     print(f"Total requests: {len(latencies)}/{N_REQUESTS} succeeded")
+    print(f"Total benchmark time : {total_time:.1f}s")
     print(f"Average latency : {avg_latency*1000:.2f} ms")
     print(f"Latency p50     : {p50:.2f} ms")
     print(f"Latency p95     : {p95:.2f} ms")
