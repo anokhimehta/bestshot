@@ -16,6 +16,7 @@ from pathlib import Path
 from PIL import Image
 from torch.utils.data import Dataset, DataLoader, random_split
 from torchvision import transforms
+from evaluate import run_inference, evaluate
 
 """
 BestShot train.py
@@ -105,7 +106,6 @@ class BestShotModel(L.LightningModule):
 def main(config):
 
     set_seed(config.get("seed", 42))
-    mlflow.log_param("seed", config.get("seed", 42))
 
     # Set up data transforms
     transform = transforms.Compose([
@@ -124,7 +124,7 @@ def main(config):
     train_loader = DataLoader(train_ds, batch_size=config['batch_size'], shuffle=True, num_workers=config.get('num_workers', 4))
     validation_loader = DataLoader(validation_ds, batch_size=config['batch_size'], shuffle=False, num_workers=config.get('num_workers', 4))
 
-    mlflow.pytorch.autolog()
+    mlflow.pytorch.autolog(log_models=False)  # we'll log manually to control registration
     mlflow.set_experiment(config['experiment_name'])
     with mlflow.start_run():
         mlflow.log_params(config)
@@ -148,14 +148,28 @@ def main(config):
 
         start = time.time()
         trainer.fit(model, train_loader, validation_loader)
+
+        eval_results = evaluate(
+            model_uri=f"runs:/{mlflow.active_run().info.run_id}/model",
+            data_dir=config['data_dir'],
+            dataset_version=config.get('dataset_version', None)
+        )
+        mlflow.log_metric("plcc", eval_results["plcc"])
+        mlflow.log_metric("srcc", eval_results["srcc"])
+        mlflow.log_metric("eval_n_samples", eval_results["n_samples"])
         mlflow.log_metric("training_time_seconds", time.time() - start)
         mlflow.log_param("peak_vram_gb", round(torch.cuda.max_memory_allocated(0) / 1e9, 2))
 
-        mlflow.pytorch.log_model(
-            model,
-            "model",
-            registered_model_name="bestshot-iqa"
-        )
+        if eval_results["passed"]:
+            mlflow.pytorch.log_model(
+                model, 
+                "model", 
+                registered_model_name="bestshot-iqa")
+            print("Model passed evaluation and has been registered.")
+        else:
+            mlflow.pytorch.log_model(model, "model")  # still saved as artifact, just not registered
+            print("Model did not pass evaluation. Not registering.")
+
 
 
 #4. Entry point
