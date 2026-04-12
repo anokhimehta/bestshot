@@ -1,8 +1,10 @@
 import os
 import json
 import csv
+import random
 import swiftclient
 import pandas as pd
+from collections import defaultdict
 from datetime import datetime
 from dotenv import load_dotenv
 
@@ -62,17 +64,13 @@ def load_interactions():
 
 def load_koniq_scores():
     """Load KonIQ-10k scores from object storage"""
-    _, content = conn.get_object(
-        BUCKET,
-        'koniq10k/koniq10k_scores_and_distributions.csv'
-    )
+    _, content = conn.get_object(BUCKET, 'koniq10k/koniq10k_scores_and_distributions.csv')
     lines = content.decode('utf-8').splitlines()
     scores = {}
     reader = csv.DictReader(lines)
     for row in reader:
         image_name = row['image_name']
         mos = float(row['MOS'])
-        # Normalize MOS from 1-5 to 0-10
         normalized_score = (mos - 1) / 4 * 10
         scores[image_name] = normalized_score
     return scores
@@ -86,7 +84,7 @@ def candidate_selection(interactions, scores):
     4. Ensure diversity across users
     """
     candidates = []
-    
+
     # Group interactions by photo_id
     photo_actions = {}
     for event in interactions:
@@ -95,7 +93,7 @@ def candidate_selection(interactions, scores):
             if photo_id not in photo_actions:
                 photo_actions[photo_id] = []
             photo_actions[photo_id].append(event)
-    
+
     # Add production photos with explicit labels
     for photo_id, actions in photo_actions.items():
         explicit_actions = [a for a in actions if a.get('confidence') == 'explicit']
@@ -112,7 +110,7 @@ def candidate_selection(interactions, scores):
                 'burst_group_id': '',
                 'feedback_action': latest_action['action']
             })
-    
+
     # Add KonIQ-10k samples
     koniq_samples = list(scores.items())
     for image_name, score in koniq_samples[:5000]:
@@ -122,7 +120,7 @@ def candidate_selection(interactions, scores):
             label = 'high'
         else:
             label = 'medium'
-        
+
         candidates.append({
             'image_path': f'koniq10k/images/{image_name}',
             'quality_score': score,
@@ -133,102 +131,93 @@ def candidate_selection(interactions, scores):
             'burst_group_id': '',
             'feedback_action': ''
         })
-    
+
+    # Balance classes using simple random sampling
+    by_label = defaultdict(list)
+    for c in candidates:
+        by_label[c['label']].append(c)
+
+    if len(by_label) > 0:
+        min_count = min(len(v) for v in by_label.values())
+        target_count = min_count * 2
+        balanced = []
+        for label, items in by_label.items():
+            if len(items) > target_count:
+                balanced.extend(random.sample(items, target_count))
+            else:
+                balanced.extend(items)
+        candidates = balanced
+
     return candidates
 
 def time_based_split(candidates, train_ratio=0.8):
-    """
-    Split by upload date to prevent leakage.
-    Train on older data, evaluate on newer data.
-    """
-    # Sort by upload date
+    """Split by upload date to prevent leakage."""
     candidates.sort(key=lambda x: x['upload_date'])
-    
     split_idx = int(len(candidates) * train_ratio)
     train = candidates[:split_idx]
     eval_set = candidates[split_idx:]
-    
-    # Add split column
     for c in train:
         c['split'] = 'train'
     for c in eval_set:
         c['split'] = 'eval'
-    
     return train, eval_set
 
 def save_dataset(train, eval_set, version):
     """Save versioned dataset to object storage"""
     fieldnames = [
         'image_path', 'quality_score', 'label', 'split',
-        'source', 'user_id', 'upload_date', 
+        'source', 'user_id', 'upload_date',
         'burst_group_id', 'feedback_action'
     ]
-    
+
     for split_name, data in [('train', train), ('eval', eval_set)]:
-        # Write to temp file
         tmp_path = f'/tmp/{split_name}.csv'
         with open(tmp_path, 'w', newline='') as f:
             writer = csv.DictWriter(f, fieldnames=fieldnames)
             writer.writeheader()
             writer.writerows(data)
-        
-        # Upload to object storage
+
         with open(tmp_path, 'rb') as f:
-            conn.put_object(
-                BUCKET,
-                f'labels/v{version}/{split_name}.csv',
-                f
-            )
+            conn.put_object(BUCKET, f'labels/v{version}/{split_name}.csv', f)
         print(f"Uploaded labels/v{version}/{split_name}.csv ({len(data)} samples)")
-    
-    # Save manifest
+
     manifest = {
         'version': version,
         'created_at': datetime.now().isoformat(),
         'train_samples': len(train),
         'eval_samples': len(eval_set),
         'sources': ['koniq10k', 'production'],
-        'filters_applied': ['explicit_labels_only', 'time_based_split']
+        'filters_applied': ['explicit_labels_only', 'time_based_split', 'class_balanced']
     }
-    
+
     manifest_json = json.dumps(manifest, indent=2).encode('utf-8')
-    conn.put_object(
-        BUCKET,
-        f'labels/v{version}/manifest.json',
-        manifest_json
-    )
+    conn.put_object(BUCKET, f'labels/v{version}/manifest.json', manifest_json)
     print(f"Uploaded labels/v{version}/manifest.json")
 
 def main():
     print("Starting batch pipeline...")
-    
-    # Get next version number
     version = get_next_version()
     print(f"Creating dataset version v{version}")
-    
-    # Load data
+
     print("Loading user interactions...")
     interactions = load_interactions()
     print(f"Found {len(interactions)} interactions")
-    
+
     print("Loading KonIQ-10k scores...")
     scores = load_koniq_scores()
     print(f"Loaded {len(scores)} KonIQ-10k scores")
-    
-    # Select candidates
+
     print("Running candidate selection...")
     candidates = candidate_selection(interactions, scores)
     print(f"Selected {len(candidates)} candidates")
-    
-    # Split dataset
+
     print("Applying time-based split...")
     train, eval_set = time_based_split(candidates)
     print(f"Train: {len(train)} | Eval: {len(eval_set)}")
-    
-    # Save to object storage
+
     print("Saving versioned dataset...")
     save_dataset(train, eval_set, version)
-    
+
     print(f"\nBatch pipeline complete!")
     print(f"Dataset v{version} saved to object storage")
     print(f"Train samples: {len(train)}")
