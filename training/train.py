@@ -10,6 +10,8 @@ import torch.nn.functional as F
 import lightning as L
 import mlflow
 import mlflow.pytorch
+import random
+import numpy as np
 from pathlib import Path
 from PIL import Image
 from torch.utils.data import Dataset, DataLoader, random_split
@@ -28,6 +30,14 @@ class EpochTimingCallback(L.Callback):
         epoch_time = time.time() - self._epoch_start
         pl_module.log("time_per_epoch_seconds", epoch_time)
         
+#use for reproducibility
+def set_seed(seed):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+
         
 #1. Dataset loading and preprocessing
 class KonIQDataset(Dataset):
@@ -93,6 +103,9 @@ class BestShotModel(L.LightningModule):
 
 #3. Training loop with logging and checkpointing
 def main(config):
+
+    set_seed(config.get("seed", 42))
+    mlflow.log_param("seed", config.get("seed", 42))
 
     # Set up data transforms
     transform = transforms.Compose([

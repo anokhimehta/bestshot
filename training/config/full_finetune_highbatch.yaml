@@ -3,5 +3,6 @@ data_dir: /data/koniq10k
 batch_size: 64
 epochs: 5
 lr: 0.00001
+seed: 42
 num_workers: 4
 frozen_stages: 0
