@@ -151,7 +151,7 @@ def run_ingestion_quality_checks(image_dir, scores_csv_path):
     return report
 
 if __name__ == "__main__":
-    IMAGE_DIR = '/tmp/koniq_images/512x384'
+    IMAGE_DIR = '/tmp/512x384'
     SCORES_CSV = '/tmp/koniq10k_scores.csv'
     
     # Download scores CSV from object storage first
