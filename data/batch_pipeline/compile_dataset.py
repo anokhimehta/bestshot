@@ -6,6 +6,22 @@ import pandas as pd
 from datetime import datetime
 from dotenv import load_dotenv
 
+def get_latest_version(conn, bucket):
+    """Get the latest dataset version number from object storage"""
+    try:
+        _, objects = conn.get_container(bucket, prefix='labels/')
+        versions = set()
+        for obj in objects:
+            parts = obj['name'].split('/')
+            if len(parts) >= 2 and parts[1].startswith('v'):
+                try:
+                    versions.add(int(parts[1][1:]))
+                except:
+                    pass
+        return max(versions) if versions else None
+    except:
+        return None
+
 load_dotenv('/home/cc/bestshot/.env')
 
 conn = swiftclient.Connection(
