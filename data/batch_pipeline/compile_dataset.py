@@ -113,6 +113,7 @@ def candidate_selection(interactions, scores):
 
     # Add KonIQ-10k samples
     koniq_samples = list(scores.items())
+    random.shuffle(koniq_samples)
     for image_name, score in koniq_samples[:5000]:
         if score < 4.0:
             label = 'low'
