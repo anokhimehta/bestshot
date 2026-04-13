@@ -149,6 +149,10 @@ def main(config):
         start = time.time()
         trainer.fit(model, train_loader, validation_loader)
 
+        #save model so it can be loaded for evaluation, even if it doesn't pass the criteria to be registered as "bestshot-iqa"
+        mlflow.pytorch.log_model(model, "model")
+
+        # Run evaluation script and log results
         eval_results = evaluate(
             model_uri=f"runs:/{mlflow.active_run().info.run_id}/model",
             data_dir=config['data_dir'],
