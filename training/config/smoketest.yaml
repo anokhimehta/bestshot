@@ -4,5 +4,6 @@ data_dir: /Users/anokhimehta/data/koniq10k
 batch_size: 4
 epochs: 1
 lr: 0.0001
+seed: 42
 limit: 50 #for smoke testing, we only use a small subset of the data
 accelerator: cpu #use CPU for smoke testing to avoid GPU overhead

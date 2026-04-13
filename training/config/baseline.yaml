@@ -4,4 +4,5 @@ data_dir: "/data/koniq10k"
 batch_size: 32
 epochs: 5
 lr: 0.0001
+seed: 42
 num_workers: 0
