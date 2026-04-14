@@ -34,6 +34,7 @@ Usage: python train.py --config config/baseline.yaml
 1. Dataset loading and preprocessing
 '''
 def get_swift_conn():
+    load_dotenv('/workspace/.env')
     load_dotenv('/home/cc/bestshot/.env')
     return swiftclient.Connection(
         auth_version='3',
