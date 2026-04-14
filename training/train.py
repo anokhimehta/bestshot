@@ -18,10 +18,68 @@ from torch.utils.data import Dataset, DataLoader, random_split
 from torchvision import transforms
 from evaluate import run_inference, evaluate
 
+import io
+import swiftclient
+from dotenv import load_dotenv
+import os
+
+BUCKET = 'ak12754-data-proj19'
+
 """
 BestShot train.py
 Usage: python train.py --config config/baseline.yaml
 """
+
+'''
+1. Dataset loading and preprocessing
+'''
+def get_swift_conn():
+    load_dotenv('/home/cc/bestshot/.env')
+    return swiftclient.Connection(
+        auth_version='3',
+        authurl=os.environ['OS_AUTH_URL'],
+        os_options={
+            'application_credential_id': os.environ['OS_APPLICATION_CREDENTIAL_ID'],
+            'application_credential_secret': os.environ['OS_APPLICATION_CREDENTIAL_SECRET'],
+            'region_name': os.environ['OS_REGION_NAME'],
+            'auth_type': 'v3applicationcredential'
+        }
+    )
+
+
+def download_dataset(conn, local_dir):
+    local_dir = Path(local_dir)
+    img_dir = local_dir / '512x384'
+    img_dir.mkdir(parents=True, exist_ok=True)
+
+    # Download CSV
+    csv_local = local_dir / 'koniq10k_scores_and_distributions.csv'
+    if not csv_local.exists():
+        print("Downloading scores CSV from object storage...")
+        _, content = conn.get_object(BUCKET, 'koniq10k/koniq10k_scores_and_distributions.csv')
+        csv_local.write_bytes(content)
+        print("CSV downloaded.")
+
+    # Download images (skip already cached)
+    df = pd.read_csv(csv_local)
+    missing = [name for name in df['image_name'] if not (img_dir / name).exists()]
+    print(f"Downloading {len(missing)} missing images (skipping {len(df) - len(missing)} cached)...")
+    for image_name in missing:
+        _, img_data = conn.get_object(BUCKET, f'koniq10k/images/{image_name}')
+        (img_dir / image_name).write_bytes(img_data)
+
+    # Return latest dataset version for lineage logging
+    try:
+        _, objects = conn.get_container(BUCKET, prefix='labels/')
+        versions = set()
+        for obj in objects:
+            parts = obj['name'].split('/')
+            if len(parts) >= 2 and parts[1].startswith('v'):
+                versions.add(int(parts[1][1:]))
+        return f"v{max(versions)}" if versions else "koniq10k-only"
+    except:
+        return "koniq10k-only"
+
 
 class EpochTimingCallback(L.Callback):
     def on_train_epoch_start(self, trainer, pl_module):
@@ -107,6 +165,10 @@ def main(config):
 
     set_seed(config.get("seed", 42))
 
+    # Download dataset from object storage if not already cached locally
+    conn = get_swift_conn()
+    dataset_version = download_dataset(conn, config['data_dir'])
+
     # Set up data transforms
     transform = transforms.Compose([
         transforms.Resize((300, 300)),
@@ -130,13 +192,7 @@ def main(config):
         mlflow.log_params(config)
         mlflow.log_param("gpu_name", torch.cuda.get_device_name(0))
         mlflow.log_param("gpu_memory_gb", round(torch.cuda.get_device_properties(0).total_memory / 1e9, 2))
-        
-        # git SHA
-        try:
-            git_sha = subprocess.check_output(["git", "rev-parse", "--short", "HEAD"]).decode().strip()
-        except subprocess.CalledProcessError:
-            git_sha = "unknown"
-        mlflow.log_param("git_sha", git_sha)
+        mlflow.log_param("dataset_version", dataset_version)
 
         model = BestShotModel(config)
         trainer = L.Trainer(
@@ -165,14 +221,14 @@ def main(config):
         mlflow.log_param("peak_vram_gb", round(torch.cuda.max_memory_allocated(0) / 1e9, 2))
 
         if eval_results["passed"]:
-            mlflow.pytorch.log_model(
-                model, 
-                "model", 
-                registered_model_name="bestshot-iqa")
+            run_id = mlflow.active_run().info.run_id
+            mv = mlflow.register_model(f"runs:/{run_id}/model", "bestshot-iqa")
+            client = mlflow.tracking.MlflowClient()
+            client.set_registered_model_alias("bestshot-iqa", "production", mv.version)
             print("Model passed evaluation and has been registered.")
         else:
-            mlflow.pytorch.log_model(model, "model")  # still saved as artifact, just not registered
-            print("Model did not pass evaluation. Not registering.")
+            print(f"Did not pass quality gate (PLCC={eval_results['plcc']:.4f}, SRCC={eval_results['srcc']:.4f}) — not registered")
+
 
 
 
