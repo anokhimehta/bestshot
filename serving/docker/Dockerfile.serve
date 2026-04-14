@@ -16,6 +16,16 @@ RUN pip install --no-cache-dir \
     opencv-python-headless \
     onnxruntime-rocm
 
+# install WITHOUT dependencies (prevents torch override)
+RUN pip install mlflow --no-deps
+RUN pip install lightning --no-deps
+
+# remove any accidental CUDA torch (trying to fix ROCm torch getting overridden by CUDA torch)
+RUN pip uninstall -y torch torchvision torchaudio || true
+
+# reinstall ROCm torch explicitly
+RUN pip install torch torchvision --index-url https://download.pytorch.org/whl/rocm6.2
+
 COPY app.py .
 COPY model.py .
 COPY benchmark.py .

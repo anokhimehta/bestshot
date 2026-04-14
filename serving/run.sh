@@ -16,9 +16,22 @@ if [ -z "$CONFIG_NAME" ]; then
 fi
 
 # set gpu flags if needed
+#if [[ "$CONFIG_NAME" == gpu_* ]]; then
+#    GPU_FLAGS="--device=/dev/kfd --device=/dev/dri --group-add video"
+#else
+#    GPU_FLAGS=""
+#fi
+
 if [[ "$CONFIG_NAME" == gpu_* ]]; then
-    GPU_FLAGS="--device=/dev/kfd --device=/dev/dri --group-add video"
+    echo "GPU config detected, setting GPU flags for Docker..." # DELETE LATER
+    GPU_FLAGS="--device=/dev/kfd \
+               --device=/dev/dri \
+               --group-add video \
+               --ipc=host \
+               --cap-add=SYS_PTRACE \
+               --security-opt seccomp=unconfined"
 else
+    echo "No GPU config detected, running without GPU flags." #DELETE LATER
     GPU_FLAGS=""
 fi
 
@@ -31,6 +44,7 @@ docker rm -f bestshot-api 2>/dev/null
 
 # start server
 echo "Starting server..."
+echo "Docker command: docker run -d --network host $GPU_FLAGS --name bestshot-api -e CONFIG_NAME=$CONFIG_NAME bestshot-serve uvicorn app:app --host"
 docker run -d --network host \
   $GPU_FLAGS \
   --name bestshot-api \
@@ -60,7 +74,7 @@ docker run --rm --network host \
   -e CONFIG_NAME=$CONFIG_NAME \
   bestshot-serve \
   sh -c "python benchmark.py"
-
+  
 # stop server
 docker stop bestshot-api
 echo ""

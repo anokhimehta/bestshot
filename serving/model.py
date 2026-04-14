@@ -5,7 +5,7 @@ from PIL import Image
 import os
 import random
 import mlflow
-import mlflow.pytorch
+import mlflow.pytorch 
 import numpy as np
 import onnxruntime as ort
 import cv2
@@ -16,7 +16,7 @@ class Model:
         # Pull model type and device from config to determine which inference engine to initialize
         from config import CONFIG 
         self.model_type = CONFIG.get("model_type", "pytorch")
-        self.device_type = CONFIG.get("device", "cpu")
+        self.device_type = CONFIG.get("device", "gup")
         
         # Preprocessing
         self.transform = transforms.Compose([
@@ -30,7 +30,7 @@ class Model:
         else:
             self._init_pytorch()
             
-    def _init_pytorch(self):
+    '''def _init_pytorch(self):
         mlflow.set_tracking_uri("http://129.114.25.172:8000")
 
         # get version info before loading
@@ -47,12 +47,43 @@ class Model:
         print("CUDA available:", torch.cuda.is_available())
         print("Selected device:", self.device)
         print("Model device:", next(self.model.parameters()).device)
+        print(f"Loaded real model v{version.version} on: {self.device}")'''
+
+    def _init_pytorch(self):
+        mlflow.set_tracking_uri("http://129.114.25.172:8000")
+
+        from mlflow.tracking import MlflowClient
+        client = MlflowClient()
+        version = client.get_model_version_by_alias("bestshot-iqa", "production")
+        print(f"Loading model: bestshot-iqa version {version.version} (run_id: {version.run_id})")
+
+        self.model = mlflow.pytorch.load_model("models:/bestshot-iqa@production")
+        self.model.eval()
+
+        # ROCm AMD GPU check — torch.cuda works for ROCm too but need to check differently
+        if self.device_type == "gpu":
+            if torch.cuda.is_available(): # is_rocm = torch.version.hip is not None
+                self.device = torch.device("cuda")
+            elif hasattr(torch, 'hip') and torch.hip.is_available():
+                self.device = torch.device("cuda")  # ROCm uses cuda device name
+            else:
+                print("WARNING: GPU requested but no GPU found, falling back to CPU")
+                self.device = torch.device("cuda") # mps? 
+        else:
+            self.device = torch.device("cuda")
+
+        self.model.to(self.device)
+        print(f"CUDA available: {torch.cuda.is_available()}")
+        #print(f"ROCm version: {torch.version.hip if hasattr(torch, 'version') and hasattr(torch.version, 'hip') else 'N/A'}")
+        #print(f"ROCm available: {torch.hip.is_available()}")
+        print(f"Selected device: {self.device}")
+        print(f"Model device: {next(self.model.parameters()).device}")
         print(f"Loaded real model v{version.version} on: {self.device}")
 
     def compute_sharpness(self, img_tensor):
         gray = 0.299 * img_tensor[:, 0] + \
-               0.587 * img_tensor[:, 1] + \
-               0.114 * img_tensor[:, 2]
+        0.587 * img_tensor[:, 1] + \
+        0.114 * img_tensor[:, 2]
         gray = gray.unsqueeze(1)
 
         laplacian = torch.tensor([
