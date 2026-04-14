@@ -4,3 +4,6 @@ timm
 opencv-python-headless
 albumentations
 pandas
+python-swiftclient
+python-keystoneclient
+python-dotenv
