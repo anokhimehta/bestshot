@@ -82,81 +82,81 @@ class Model:
 
     def compute_sharpness(self, img_tensor):
         gray = 0.299 * img_tensor[:, 0] + \
-        0.587 * img_tensor[:, 1] + \
-        0.114 * img_tensor[:, 2]
+            0.587 * img_tensor[:, 1] + \
+            0.114 * img_tensor[:, 2]
         gray = gray.unsqueeze(1)
 
-        laplacian = torch.tensor([
+        laplacian_kernel = torch.tensor([
             [0,  1, 0],
             [1, -4, 1],
             [0,  1, 0]
-        ], dtype=torch.float32).view(1, 1, 3, 3).to(self.device)
+        ], dtype=torch.float32, device=self.device).view(1, 1, 3, 3)
 
-        edges = torch.nn.functional.conv2d(gray, laplacian, padding=1)
-        scores = edges.var(dim=[1, 2, 3])
-        return (scores * 500).clamp(0, 10)
+        edges = torch.nn.functional.conv2d(gray, laplacian_kernel, padding=1)
 
+        variance = edges.var(dim=[1, 2, 3])
+
+        # normalize to match data team but keep 0-10 range for interpretability ASK data about why did 0-1
+        score = (variance * 300).clamp(0, 10)
+
+        return score
 
     def compute_exposure(self, img_tensor):
-        """Exposure score using PyTorch — runs on GPU"""
-        # brightness = mean of all channels per image
-        brightness = img_tensor.mean(dim=[1, 2, 3]) * 255  # (batch,)
-        # penalize deviation from ideal brightness (128)
-        score = 10.0 - (brightness - 128).abs() / 12.8
-        return score.clamp(0, 10)  # shape: (batch,)
+        gray = 0.299 * img_tensor[:, 0] + \
+            0.587 * img_tensor[:, 1] + \
+            0.114 * img_tensor[:, 2]
 
-    """def compute_face_quality(self, img_path):
-        import time
-        t0 = time.time()
-        if not os.path.exists(img_path):
-            return random.uniform(5.0, 10.0)
-        
-        img = cv2.imread(img_path)
-        img = cv2.resize(img, (224, 224))
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        
-        # load cascades
-        face_cascade = cv2.CascadeClassifier(
-            cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
-        )
-        eye_cascade = cv2.CascadeClassifier(
-            cv2.data.haarcascades + 'haarcascade_eye.xml'
-        )
-        
-        faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5)
-        
-        if len(faces) == 0:
-            # no faces — neutral score
-            return 7.0
-        
-        # use the largest face
-        best_face = max(faces, key=lambda f: f[2] * f[3])
-        x, y, w, h = best_face
-        
-        # face size score — larger face = better framing
-        img_area  = 224 * 224
-        face_area = w * h
-        coverage  = face_area / img_area
-        size_score = min(coverage * 50, 10.0)
-        
-        # eye check — look for eyes within the face region
-        face_roi = gray[y:y+h, x:x+w]
-        eyes = eye_cascade.detectMultiScale(face_roi, scaleFactor=1.1, minNeighbors=3)
-        
-        if len(eyes) >= 2:
-            # both eyes detected — eyes are open
-            eye_score = 10.0
-        elif len(eyes) == 1:
-            # only one eye detected — possibly closed or turned
-            eye_score = 5.0
-        else:
-            # no eyes detected — likely closed eyes
-            eye_score = 2.0
-        
-        # combine size and eye scores
-        face_quality = (size_score * 0.4 + eye_score * 0.6)
-        print(f"face_quality took: {(time.time()-t0)*1000:.1f}ms")
-        return round(max(face_quality, 2.0), 4)"""
+        # brightness (0–1)
+        brightness = gray.mean(dim=[1, 2])
+
+        # contrast (std dev)
+        contrast = gray.std(dim=[1, 2])
+
+        # ideal brightness ~0.5
+        brightness_score = 1.0 - (brightness - 0.5).abs() * 2
+
+        # encourage some contrast (not flat)
+        contrast_score = (contrast * 2).clamp(0, 1)
+
+        # combine
+        score = (0.7 * brightness_score + 0.3 * contrast_score) * 10
+
+        return score.clamp(0, 10)
+
+    def compute_face_quality(self, img_tensor):
+        B, C, H, W = img_tensor.shape
+
+        # center crop (assume face likely here)
+        h1, h2 = int(H * 0.25), int(H * 0.75)
+        w1, w2 = int(W * 0.25), int(W * 0.75)
+
+        center = img_tensor[:, :, h1:h2, w1:w2]
+
+        # sharpness logic from above 
+        gray = 0.299 * center[:, 0] + \
+            0.587 * center[:, 1] + \
+            0.114 * center[:, 2]
+        gray = gray.unsqueeze(1)
+
+        laplacian_kernel = torch.tensor([
+            [0,  1, 0],
+            [1, -4, 1],
+            [0,  1, 0]
+        ], dtype=torch.float32, device=self.device).view(1, 1, 3, 3)
+
+        edges = torch.nn.functional.conv2d(gray, laplacian_kernel, padding=1)
+        sharpness = edges.var(dim=[1, 2, 3])
+
+        sharpness_score = (sharpness * 300).clamp(0, 10)
+
+        # brightness
+        brightness = gray.mean(dim=[1, 2, 3])
+        brightness_score = (1.0 - (brightness - 0.5).abs() * 2) * 10
+
+        # combine
+        score = 0.6 * sharpness_score + 0.4 * brightness_score
+
+        return score.clamp(0, 10)
 
     def _init_onnx(self):
         # AMD-optimized ONNX setup
