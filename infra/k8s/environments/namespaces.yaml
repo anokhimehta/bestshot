@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: bestshot-staging
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: bestshot-canary
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: bestshot-production

@@ -1,4 +1,5 @@
-FROM rocm/pytorch:rocm6.3.3_ubuntu24.04_py3.12_pytorch_release_2.4.0
+#FROM rocm/pytorch:rocm6.3.3_ubuntu24.04_py3.12_pytorch_release_2.4.0
+FROM rocm/pytorch:rocm6.2_ubuntu22.04_py3.10_pytorch_release_2.3.0
 
 WORKDIR /app
 
@@ -9,7 +10,21 @@ RUN pip install --no-cache-dir \
     pillow \
     numpy \
     requests \
+    mlflow \
+    lightning \
+    timm \
+    opencv-python-headless \
     onnxruntime-rocm
+
+# install WITHOUT dependencies (prevents torch override)
+RUN pip install mlflow --no-deps
+RUN pip install lightning --no-deps
+
+# remove any accidental CUDA torch (trying to fix ROCm torch getting overridden by CUDA torch)
+RUN pip uninstall -y torch torchvision torchaudio || true
+
+# reinstall ROCm torch explicitly
+RUN pip install torch torchvision --index-url https://download.pytorch.org/whl/rocm6.2
 
 COPY app.py .
 COPY model.py .
