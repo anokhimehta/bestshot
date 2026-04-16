@@ -10,8 +10,8 @@ import swiftclient
 load_dotenv('/home/cc/bestshot/.env')
 
 # Immich configuration
-IMMICH_URL = os.environ.get('IMMICH_URL', 'http://129.114.27.10:30283')
-IMMICH_API_KEY = os.environ.get('IMMICH_API_KEY', 'd76f56yfIR4xekGvAEGntgDZerSnczlBra6dG6og')
+IMMICH_URL = os.environ.get('IMMICH_URL', 'http://129.114.26.156:30283')
+IMMICH_API_KEY = os.environ.get('IMMICH_API_KEY', 'OJNgOTOhodaKdd2jgBRg2ynv82VeTD1cQef2Ky8vPQ')
 HEADERS = {'x-api-key': IMMICH_API_KEY}
 
 # Object storage configuration
