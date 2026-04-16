@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
       - name: features
-        image: bestshot-features:latest
+        image: ghcr.io/anokhimehta/bestshot-features:latest
         ports:
         - containerPort: 8000
         resources:

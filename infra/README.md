@@ -73,3 +73,31 @@ kubectl get pods -n bestshot-app
 
 ## Secrets
 Secrets are never committed to git. Create `immich-db-secret` with `kubectl create secret` as in Step 6 (`DB_PASSWORD`, `DB_USERNAME`, `DB_DATABASE_NAME`).
+
+## Full System Architecture
+
+### Environments
+| Environment | URL | Model Stage |
+|---|---|---|
+| Staging | http://129.114.27.200:30801 | Staging |
+| Canary | http://129.114.27.200:30802 | Production (small traffic) |
+| Production | http://129.114.27.200:30803 | Production |
+| MLflow | http://129.114.27.200:30500 | — |
+| Immich | http://129.114.27.200:30283 | — |
+
+### Automated Workflows
+- Retraining: CronJob runs nightly at 2am (infra/k8s/jobs/retrain-cronjob.yaml)
+- Promotion: CronJob runs at 2:30am, promotes if PLCC≥0.85, SRCC≥0.83
+- Rollback: CronJob checks production health every 15 min, auto-rollback if down
+- Health monitoring: CronJob runs every 5 min, alerts if any service fails
+- Autoscaling: HPA scales production serving pods when CPU>70% or RAM>80%
+
+### CI/CD
+Push to main → GitHub Actions builds all images → pushes to ghcr.io → deploys to K8S
+See .github/workflows/ci.yml
+
+### Secrets Required (create manually — never in git)
+kubectl create secret generic openstack-credentials \
+  --from-literal=OS_APPLICATION_CREDENTIAL_ID=<id> \
+  --from-literal=OS_APPLICATION_CREDENTIAL_SECRET=<secret> \
+  -n bestshot-platform

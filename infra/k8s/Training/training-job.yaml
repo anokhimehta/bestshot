@@ -10,7 +10,7 @@ spec:
     spec:
       containers:
       - name: training
-        image: bestshot-training:latest
+        image: ghcr.io/anokhimehta/bestshot-training:latest
         resources:
           requests:
             cpu: "1000m"

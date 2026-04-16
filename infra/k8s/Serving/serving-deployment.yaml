@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
       - name: serving
-        image: bestshot-serving:latest
+        image: ghcr.io/anokhimehta/bestshot-serving:latest
         ports:
         - containerPort: 8000
         resources:

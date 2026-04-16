@@ -10,7 +10,7 @@ spec:
     spec:
       containers:
       - name: batch-pipeline
-        image: bestshot-batch-pipeline:latest
+        image: ghcr.io/anokhimehta/bestshot-batch-pipeline:latest
         resources:
           requests:
             cpu: "250m"

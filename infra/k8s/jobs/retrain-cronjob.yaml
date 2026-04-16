@@ -1,0 +1,31 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: bestshot-retrain
+  namespace: bestshot-platform
+spec:
+  schedule: "0 2 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: retrain
+            image: ghcr.io/anokhimehta/bestshot-training:latest
+            command: ["python", "retrain.py"]
+            envFrom:
+            - secretRef:
+                name: openstack-credentials
+            - secretRef:
+                name: mlflow-credentials
+            resources:
+              requests:
+                cpu: "1000m"
+                memory: "4Gi"
+              limits:
+                cpu: "4000m"
+                memory: "16Gi"
+          restartPolicy: OnFailure
