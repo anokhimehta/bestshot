@@ -10,7 +10,7 @@ spec:
     spec:
       containers:
       - name: generator
-        image: bestshot-generator:latest
+        image: ghcr.io/anokhimehta/bestshot-generator:latest
         resources:
           requests:
             cpu: "250m"

@@ -1,0 +1,27 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: bestshot-promote
+  namespace: bestshot-platform
+spec:
+  schedule: "30 2 * * *"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: promote
+            image: ghcr.io/anokhimehta/bestshot-training:latest
+            command: ["python", "/scripts/promote.py", "promote"]
+            envFrom:
+            - secretRef:
+                name: mlflow-credentials
+            volumeMounts:
+            - name: scripts
+              mountPath: /scripts
+          volumes:
+          - name: scripts
+            configMap:
+              name: promote-script
+          restartPolicy: OnFailure

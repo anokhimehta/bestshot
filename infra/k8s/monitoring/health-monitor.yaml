@@ -1,0 +1,84 @@
+# ─── Resource Quotas ──────────────────────────────────────────
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: platform-quota
+  namespace: bestshot-platform
+spec:
+  hard:
+    requests.cpu: "6"
+    requests.memory: "12Gi"
+    limits.cpu: "12"
+    limits.memory: "24Gi"
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: production-quota
+  namespace: bestshot-production
+spec:
+  hard:
+    requests.cpu: "4"
+    requests.memory: "8Gi"
+    limits.cpu: "8"
+    limits.memory: "16Gi"
+---
+# ─── Health Monitor CronJob ───────────────────────────────────
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: bestshot-health-monitor
+  namespace: bestshot-platform
+spec:
+  schedule: "*/5 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 5
+  failedJobsHistoryLimit: 5
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: monitor
+            image: python:3.12-slim
+            command:
+            - python
+            - -c
+            - |
+              import urllib.request
+              import json
+              import datetime
+              import sys
+
+              timestamp = datetime.datetime.utcnow().isoformat()
+
+              services = [
+                  ("MLflow",      "http://mlflow.bestshot-platform.svc.cluster.local:5000/health"),
+                  ("Immich",      "http://immich-server.bestshot-app.svc.cluster.local:2283/api/server-info/ping"),
+                  ("Serving-STG", "http://bestshot-serving-staging.bestshot-staging.svc.cluster.local:8000/health"),
+                  ("Serving-PRD", "http://bestshot-serving-production.bestshot-production.svc.cluster.local:8000/health"),
+                  ("Features",    "http://bestshot-features.bestshot-platform.svc.cluster.local:8000/health"),
+              ]
+
+              results = {}
+              failed = []
+
+              for name, url in services:
+                  try:
+                      req = urllib.request.urlopen(url, timeout=5)
+                      results[name] = "healthy"
+                      print(f"[{timestamp}] ✅ {name}: OK")
+                  except Exception as e:
+                      results[name] = f"FAILED: {str(e)}"
+                      failed.append(name)
+                      print(f"[{timestamp}] ❌ {name}: FAILED — {e}")
+
+              print(f"\nSummary: {len(services) - len(failed)}/{len(services)} healthy")
+
+              if failed:
+                  print(f"ALERT: Services down: {failed}")
+                  sys.exit(1)
+              else:
+                  print("All services healthy ✅")
+                  sys.exit(0)
+          restartPolicy: OnFailure

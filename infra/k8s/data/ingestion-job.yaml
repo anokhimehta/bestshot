@@ -10,7 +10,7 @@ spec:
     spec:
       containers:
       - name: ingestion
-        image: bestshot-ingestion:latest
+        image: ghcr.io/anokhimehta/bestshot-ingestion:latest
         resources:
           requests:
             cpu: "250m"
