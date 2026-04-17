@@ -1,6 +1,5 @@
 #!/bin/bash
 # Usage: ./run.sh <config_name>
-# Example: ./run.sh cpu_sequential
 
 CONFIG_NAME=$1
 
@@ -15,15 +14,8 @@ if [ -z "$CONFIG_NAME" ]; then
     exit 1
 fi
 
-# set gpu flags if needed
-#if [[ "$CONFIG_NAME" == gpu_* ]]; then
-#    GPU_FLAGS="--device=/dev/kfd --device=/dev/dri --group-add video"
-#else
-#    GPU_FLAGS=""
-#fi
-
 if [[ "$CONFIG_NAME" == gpu_* ]]; then
-    echo "GPU config detected, setting GPU flags for Docker..." # DELETE LATER
+    echo "GPU config detected, setting GPU flags for Docker..."
     GPU_FLAGS="--device=/dev/kfd \
                --device=/dev/dri \
                --group-add video \
@@ -31,42 +23,37 @@ if [[ "$CONFIG_NAME" == gpu_* ]]; then
                --cap-add=SYS_PTRACE \
                --security-opt seccomp=unconfined"
 else
-    echo "No GPU config detected, running without GPU flags." #DELETE LATER
+    echo "No GPU config detected, running without GPU flags."
     GPU_FLAGS=""
 fi
 
 echo "======================================"
 echo "  Running config: $CONFIG_NAME"
-echo "======================================\\n"
+echo "======================================\n"
 
-# clean up old container
 docker rm -f bestshot-api 2>/dev/null
 
-# start server
 echo "Starting server..."
-echo "Docker command: docker run -d --network host $GPU_FLAGS --name bestshot-api -e CONFIG_NAME=$CONFIG_NAME bestshot-serve uvicorn app:app --host"
 docker run -d --network host \
   $GPU_FLAGS \
+  --env-file .env \
   --name bestshot-api \
   -e CONFIG_NAME=$CONFIG_NAME \
   bestshot-serve \
   uvicorn app:app --host 0.0.0.0 --port 8000
 
-# wait for server
 echo "Waiting for server..."
 until curl -s http://127.0.0.1:8000/docs > /dev/null; do
     sleep 2
     echo "  still waiting..."
 done
-echo "Server ready!\\n"
+echo "Server ready!\n"
 
-# resource snapshot
 echo ""
 echo "Resource usage:"
 docker stats bestshot-api --no-stream \
   --format "  CPU: {{.CPUPerc}}  MEM: {{.MemUsage}}"
 
-# run benchmark
 echo ""
 echo "Running benchmark..."
 docker run --rm --network host \
@@ -74,8 +61,7 @@ docker run --rm --network host \
   -e CONFIG_NAME=$CONFIG_NAME \
   bestshot-serve \
   sh -c "python benchmark.py"
-  
-# stop server
+
 docker stop bestshot-api
 echo ""
-echo "Done: $CONFIG_NAME"s
+echo "Done: $CONFIG_NAME"
