@@ -224,5 +224,22 @@ def main():
     print(f"Train samples: {len(train)}")
     print(f"Eval samples: {len(eval_set)}")
 
+# Step — Run training quality checks
+    import subprocess
+    print("\nRunning training quality checks...")
+    result = subprocess.run(
+        ['/home/cc/bestshot/venv/bin/python',
+         '/home/cc/bestshot/repo/data/batch_pipeline/training_quality_checks.py',
+         str(version)],
+        capture_output=True,
+        text=True
+    )
+    print(result.stdout)
+
+    if result.returncode == 0:
+        print(f"✅ Training quality checks PASSED — dataset v{version} ready for retraining!")
+    else:
+        print(f"❌ Training quality checks FAILED — retraining NOT triggered!")
+
 if __name__ == "__main__":
     main()
