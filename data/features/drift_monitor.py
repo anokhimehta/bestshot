@@ -160,6 +160,16 @@ def run_drift_monitoring(image_dir):
 
     if alerts:
         report['status'] = 'DRIFT_DETECTED'
+# Write drift alert flag to object storage
+        alert_flag = {
+            'drift_detected': True,
+            'timestamp': datetime.now().isoformat(),
+            'alerts': alerts,
+            'action_required': 'Consider retraining model'
+        }
+        alert_json = json.dumps(alert_flag, indent=2).encode('utf-8')
+        conn.put_object(BUCKET, 'labels/drift_alert.json', alert_json)
+        print("⚠️  Drift alert written to object storage: labels/drift_alert.json")
         print(f"\n⚠️  DRIFT DETECTED — {len(alerts)} alert(s):")
         for alert in alerts:
             print(f"  [{alert['severity']}] {alert['message']}")

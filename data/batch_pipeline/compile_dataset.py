@@ -54,10 +54,25 @@ def get_next_version():
         return 1
 
 def load_interactions():
-    """Load user interactions from object storage"""
+    """Load user interactions from object storage (supports both JSON and JSONL)"""
     try:
         _, content = conn.get_object(BUCKET, 'production/interactions_log.json')
-        return json.loads(content)
+        decoded = content.decode('utf-8').strip()
+        
+        # Try JSON array first
+        if decoded.startswith('['):
+            interactions = json.loads(decoded)
+            print(f"Loaded {len(interactions)} interactions from JSON array")
+            return interactions
+        
+        # Try JSONL format
+        interactions = []
+        for line in decoded.splitlines():
+            line = line.strip()
+            if line:
+                interactions.append(json.loads(line))
+        print(f"Loaded {len(interactions)} interactions from JSONL")
+        return interactions
     except:
         print("No interactions log found, using empty list")
         return []
@@ -223,6 +238,23 @@ def main():
     print(f"Dataset v{version} saved to object storage")
     print(f"Train samples: {len(train)}")
     print(f"Eval samples: {len(eval_set)}")
+
+# Step — Run training quality checks
+    import subprocess
+    print("\nRunning training quality checks...")
+    result = subprocess.run(
+        ['/home/cc/bestshot/venv/bin/python',
+         '/home/cc/bestshot/repo/data/batch_pipeline/training_quality_checks.py',
+         str(version)],
+        capture_output=True,
+        text=True
+    )
+    print(result.stdout)
+
+    if result.returncode == 0:
+        print(f"✅ Training quality checks PASSED — dataset v{version} ready for retraining!")
+    else:
+        print(f"❌ Training quality checks FAILED — retraining NOT triggered!")
 
 if __name__ == "__main__":
     main()
