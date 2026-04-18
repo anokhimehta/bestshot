@@ -24,7 +24,9 @@ RUN pip install lightning --no-deps
 RUN pip uninstall -y torch torchvision torchaudio || true
 
 # reinstall ROCm torch explicitly
-RUN pip install torch torchvision --index-url https://download.pytorch.org/whl/rocm6.2
+ARG TORCH_INDEX=https://download.pytorch.org/whl/cpu
+RUN pip install torch torchvision --index-url ${TORCH_INDEX}
+#in the Chameleon deployment you can pass --build-arg TORCH_INDEX=https://download.pytorch.org/whl/rocm6.2
 
 COPY app.py .
 COPY model.py .
