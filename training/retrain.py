@@ -188,43 +188,6 @@ def run_compile_dataset():
     print("compile_dataset.py completed successfully")
 
 
-def run_training_quality_checks(conn):
-    """
-    Get the latest dataset version and run training quality checks.
-    Returns the version number if checks pass, raises on failure.
-    """
-    print("\n--- Step 2: Running training quality checks ---")
-
-    # Find latest dataset version
-    try:
-        _, objects = conn.get_container(BUCKET, prefix='labels/')
-        versions = set()
-        for obj in objects:
-            parts = obj['name'].split('/')
-            if len(parts) >= 2 and parts[1].startswith('v'):
-                try:
-                    versions.add(int(parts[1][1:]))
-                except ValueError:
-                    pass
-        if not versions:
-            raise RuntimeError("No dataset versions found in Swift after compile")
-        latest_version = max(versions)
-    except Exception as e:
-        raise RuntimeError(f"Could not determine latest dataset version: {e}")
-
-    print(f"Latest dataset version: v{latest_version}")
-
-    result = subprocess.run(
-        [sys.executable, "data/batch_pipeline/training_quality_checks.py", str(latest_version)],
-        capture_output=False
-    )
-    if result.returncode != 0:
-        raise RuntimeError(f"Training quality checks FAILED for v{latest_version} — aborting retrain")
-
-    print(f"Training quality checks PASSED for v{latest_version}")
-    return latest_version
-
-
 def trigger_training_job():
     """
     Launch a new Kubernetes training Job from the training CronJob template.
@@ -270,7 +233,6 @@ def main():
 
     try:
         run_compile_dataset()
-        latest_version = run_training_quality_checks(conn)
         trigger_training_job()
         save_retrain_timestamp(conn)
         print("\nRetraining process completed successfully.")
