@@ -17,7 +17,9 @@ RUN pip install --no-cache-dir \
     python-swiftclient \
     keystoneauth1 \
     python-keystoneclient \
-    python-dotenv
+    python-dotenv\
+    prometheus-fastapi-instrumentator \
+    prometheus-client
 
 # install WITHOUT dependencies (prevents torch override)
 RUN pip install mlflow --no-deps
