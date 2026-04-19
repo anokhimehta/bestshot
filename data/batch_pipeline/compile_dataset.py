@@ -24,7 +24,7 @@ def get_latest_version(conn, bucket):
     except:
         return None
 
-load_dotenv('/home/cc/bestshot/.env')
+load_dotenv()
 
 conn = swiftclient.Connection(
     auth_version='3',
@@ -243,9 +243,8 @@ def main():
     import subprocess
     print("\nRunning training quality checks...")
     result = subprocess.run(
-        ['/home/cc/bestshot/venv/bin/python',
-         '/home/cc/bestshot/repo/data/batch_pipeline/training_quality_checks.py',
-         str(version)],
+    ['python', 'data/batch_pipeline/training_quality_checks.py',
+     str(version)],
         capture_output=True,
         text=True
     )

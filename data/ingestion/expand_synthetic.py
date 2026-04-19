@@ -5,7 +5,7 @@ import swiftclient
 from dotenv import load_dotenv
 import tempfile
 
-load_dotenv('/home/cc/bestshot/.env')
+load_dotenv()
 
 # Connect to object storage
 conn = swiftclient.Connection(
