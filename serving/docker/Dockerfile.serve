@@ -17,7 +17,9 @@ RUN pip install --no-cache-dir \
     python-swiftclient \
     keystoneauth1 \
     python-keystoneclient \
-    python-dotenv
+    python-dotenv\
+    prometheus-fastapi-instrumentator \
+    prometheus-client
 
 # install WITHOUT dependencies (prevents torch override)
 RUN pip install mlflow --no-deps
@@ -27,7 +29,9 @@ RUN pip install lightning --no-deps
 RUN pip uninstall -y torch torchvision torchaudio || true
 
 # reinstall ROCm torch explicitly
-RUN pip install torch torchvision --index-url https://download.pytorch.org/whl/rocm6.2
+ARG TORCH_INDEX=https://download.pytorch.org/whl/cpu
+RUN pip install torch torchvision --index-url ${TORCH_INDEX}
+#in the Chameleon deployment you can pass --build-arg TORCH_INDEX=https://download.pytorch.org/whl/rocm6.2
 
 COPY app.py .
 COPY model.py .

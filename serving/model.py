@@ -16,7 +16,7 @@ class Model:
         # Pull model type and device from config to determine which inference engine to initialize
         from config import CONFIG 
         self.model_type = CONFIG.get("model_type", "pytorch")
-        self.device_type = CONFIG.get("device", "gup")
+        self.device_type = CONFIG.get("device", "gpu")
         
         # Preprocessing
         self.transform = transforms.Compose([
@@ -29,32 +29,14 @@ class Model:
             self._init_onnx()
         else:
             self._init_pytorch()
-            
-    '''def _init_pytorch(self):
-        mlflow.set_tracking_uri("http://129.114.25.172:8000")
-
-        # get version info before loading
-        from mlflow.tracking import MlflowClient
-        client = MlflowClient()
-        version = client.get_model_version_by_alias("bestshot-iqa", "production")
-        print(f"Loading model: bestshot-iqa version {version.version} (run_id: {version.run_id})")
-
-        self.model = mlflow.pytorch.load_model("models:/bestshot-iqa@production")
-        self.model.eval()
-        self.device = torch.device("cuda" if self.device_type == "gpu" and torch.cuda.is_available() else "cpu")
-        self.model.to(self.device)
-
-        print("CUDA available:", torch.cuda.is_available())
-        print("Selected device:", self.device)
-        print("Model device:", next(self.model.parameters()).device)
-        print(f"Loaded real model v{version.version} on: {self.device}")'''
 
     def _init_pytorch(self):
-        mlflow.set_tracking_uri("http://129.114.25.172:8000")
+        mlflow.set_tracking_uri("http://129.114.25.247:8000")
 
         from mlflow.tracking import MlflowClient
         client = MlflowClient()
         version = client.get_model_version_by_alias("bestshot-iqa", "production")
+        #print(f"Loading model: bestshot-iqa version {latest.version} (run_id: {latest.run_id})")
         print(f"Loading model: bestshot-iqa version {version.version} (run_id: {version.run_id})")
 
         self.model = mlflow.pytorch.load_model("models:/bestshot-iqa@production")
