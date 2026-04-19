@@ -161,7 +161,6 @@ def main():
                     'user_id': user_id,
                     'action': action,
                     'timestamp': datetime.now().isoformat(),
-                    'confidence': 'explicit'
                 }
                 interactions.append(feedback_event)
 

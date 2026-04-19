@@ -111,17 +111,10 @@ def candidate_selection(interactions, scores):
 
     # Add production photos with explicit labels
     for photo_id, actions in photo_actions.items():
-        explicit_actions = [a for a in actions if a.get('confidence') == 'explicit']
+        explicit_actions = [a for a in actions if 'action' in a]
         if explicit_actions:
             latest_action = explicit_actions[-1]
-            feature = latest_action.get('feature', 'review_for_deletion')
-            action = latest_action['action']
-            if feature == 'review_for_deletion':
-                label = 'low' if action == 'delete' else 'high'
-            elif feature == 'best_shot':
-                label = 'low' if action == 'delete' else 'high'
-            else:
-                label = 'low' if action == 'delete' else 'high'
+            label = 'low' if latest_action['action'] == 'delete' else 'high'
             candidates.append({
                 'image_path': f'production/user_uploads/{latest_action["user_id"]}/{photo_id}',
                 'quality_score': 2.0 if label == 'low' else 8.0,
