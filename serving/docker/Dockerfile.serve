@@ -9,29 +9,22 @@ RUN pip install --no-cache-dir \
     pillow \
     numpy \
     requests \
-    mlflow \
-    lightning \
-    timm \
-    opencv-python-headless \
-    onnxruntime-rocm \
     python-swiftclient \
     keystoneauth1 \
     python-keystoneclient \
-    python-dotenv\
+    python-dotenv \
     prometheus-fastapi-instrumentator \
-    prometheus-client
+    prometheus-client \
+    timm \
+    opencv-python-headless \
+    onnxruntime-rocm \
+    mlflow \
+    lightning
 
-# install WITHOUT dependencies (prevents torch override)
-RUN pip install mlflow --no-deps
-RUN pip install lightning --no-deps
-
-# remove any accidental CUDA torch
-RUN pip uninstall -y torch torchvision torchaudio || true
-
-# reinstall ROCm torch explicitly
-ARG TORCH_INDEX=https://download.pytorch.org/whl/cpu
-RUN pip install torch torchvision --index-url ${TORCH_INDEX}
-#in the Chameleon deployment you can pass --build-arg TORCH_INDEX=https://download.pytorch.org/whl/rocm6.2
+# force reinstall ROCm torch AFTER mlflow/lightning to override any CPU torch they installed
+RUN pip install --force-reinstall --no-cache-dir \
+    torch torchvision \
+    --index-url https://download.pytorch.org/whl/rocm6.2
 
 COPY app.py .
 COPY model.py .
