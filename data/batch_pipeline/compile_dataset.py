@@ -1,3 +1,4 @@
+import sys
 import os
 import json
 import csv
@@ -243,7 +244,7 @@ def main():
     import subprocess
     print("\nRunning training quality checks...")
     result = subprocess.run(
-    ['python', 'data/batch_pipeline/training_quality_checks.py',
+    [sys.executable, 'data/batch_pipeline/training_quality_checks.py',
      str(version)],
         capture_output=True,
         text=True
