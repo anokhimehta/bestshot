@@ -12,5 +12,6 @@ COPY training/docker/requirements.txt /tmp/requirements.txt
 RUN pip install --no-cache-dir -r /tmp/requirements.txt \
     && rm /tmp/requirements.txt
 
-COPY training/ /app/
-WORKDIR /app
+COPY training/ /app/training/
+COPY data/batch_pipeline/ /app/data/batch_pipeline/
+WORKDIR /app/training
