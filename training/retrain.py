@@ -210,26 +210,6 @@ def trigger_training_job():
     if create_result.returncode != 0:
         raise RuntimeError(f"kubectl create failed: {create_result.stderr}")
 
-    # Reuse the retrain CronJob template (image/env/resources), then
-    # override command so this child Job runs train.py instead of retrain.py.
-    patch_payload = (
-        '[{"op":"replace","path":"/spec/template/spec/containers/0/command",'
-        '"value":["python","train.py"]}]'
-    )
-    patch_result = subprocess.run(
-        [
-            "kubectl", "patch", "job", job_name,
-            "-n", "bestshot-platform",
-            "--type=json",
-            "-p", patch_payload
-        ],
-        capture_output=True,
-        text=True
-    )
-
-    if patch_result.returncode != 0:
-        raise RuntimeError(f"kubectl patch failed: {patch_result.stderr}")
-
     print(f"Launched training job: {job_name}")
     print(create_result.stdout)
     print("Patched job command to run train.py")
