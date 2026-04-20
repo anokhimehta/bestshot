@@ -3,6 +3,9 @@ FROM rocm/pytorch:rocm6.2_ubuntu22.04_py3.10_pytorch_release_2.3.0
 WORKDIR /app
 
 RUN pip install --no-cache-dir \
+    --extra-index-url https://download.pytorch.org/whl/rocm6.2 \
+    torch==2.5.1+rocm6.2 \
+    torchvision==0.20.1+rocm6.2 \
     fastapi \
     uvicorn \
     onnx \
@@ -20,11 +23,6 @@ RUN pip install --no-cache-dir \
     onnxruntime-rocm \
     mlflow \
     lightning
-
-# force reinstall ROCm torch AFTER mlflow/lightning to override any CPU torch they installed
-RUN pip install --force-reinstall --no-cache-dir \
-    torch torchvision \
-    --index-url https://download.pytorch.org/whl/rocm6.2
 
 COPY app.py .
 COPY model.py .
