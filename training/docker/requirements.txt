@@ -7,3 +7,5 @@ pandas
 python-swiftclient
 python-keystoneclient
 python-dotenv
+pandas
+numpy

@@ -20,9 +20,19 @@ spec:
         image: ghcr.io/anokhimehta/bestshot-serving:latest
         env:
         - name: MODEL_STAGE
-          value: "Production"
+          value: "Canary"
         - name: ENVIRONMENT
           value: "canary"
+        - name: BUCKET_NAME
+          value: "ak12754-data-proj19"
+        - name: OS_REGION_NAME
+          value: "CHI@TACC"
+        - name: OS_AUTH_TYPE
+          value: "v3applicationcredential"
+        - name: MLFLOW_MODEL_ALIAS
+          value: "production"
+        - name: DEVICE
+          value: "cpu"
         envFrom:
         - secretRef:
             name: mlflow-credentials

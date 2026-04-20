@@ -42,7 +42,7 @@ jobs:
     - name: Build and push training image
       uses: docker/build-push-action@v5
       with:
-        context: ./training/docker
+        context: .
         file: ./training/docker/Dockerfile
         push: true
         tags: |

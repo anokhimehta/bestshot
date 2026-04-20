@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mlflow-egress-proxy
+  namespace: bestshot-platform
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mlflow-egress-proxy
+  template:
+    metadata:
+      labels:
+        app: mlflow-egress-proxy
+    spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      containers:
+      - name: socat
+        image: alpine/socat:1.8.0.0
+        args:
+          - "TCP-LISTEN:18000,fork,reuseaddr"
+          - "TCP:129.114.25.247:8000"
+        ports:
+        - containerPort: 18000
+        resources:
+          requests:
+            cpu: "50m"
+            memory: "64Mi"
+          limits:
+            cpu: "200m"
+            memory: "256Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mlflow-egress-proxy
+  namespace: bestshot-platform
+spec:
+  selector:
+    app: mlflow-egress-proxy
+  ports:
+  - port: 8000
+    targetPort: 18000

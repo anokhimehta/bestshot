@@ -3,35 +3,26 @@ FROM rocm/pytorch:rocm6.2_ubuntu22.04_py3.10_pytorch_release_2.3.0
 WORKDIR /app
 
 RUN pip install --no-cache-dir \
+    --extra-index-url https://download.pytorch.org/whl/rocm6.2 \
+    torch==2.5.1+rocm6.2 \
+    torchvision==0.20.1+rocm6.2 \
     fastapi \
     uvicorn \
     onnx \
     pillow \
     numpy \
     requests \
-    mlflow \
-    lightning \
-    timm \
-    opencv-python-headless \
-    onnxruntime-rocm \
     python-swiftclient \
     keystoneauth1 \
     python-keystoneclient \
-    python-dotenv\
+    python-dotenv \
     prometheus-fastapi-instrumentator \
-    prometheus-client
-
-# install WITHOUT dependencies (prevents torch override)
-RUN pip install mlflow --no-deps
-RUN pip install lightning --no-deps
-
-# remove any accidental CUDA torch
-RUN pip uninstall -y torch torchvision torchaudio || true
-
-# reinstall ROCm torch explicitly
-ARG TORCH_INDEX=https://download.pytorch.org/whl/cpu
-RUN pip install torch torchvision --index-url ${TORCH_INDEX}
-#in the Chameleon deployment you can pass --build-arg TORCH_INDEX=https://download.pytorch.org/whl/rocm6.2
+    prometheus-client \
+    timm \
+    opencv-python-headless \
+    onnxruntime-rocm \
+    mlflow \
+    lightning
 
 COPY app.py .
 COPY model.py .
@@ -41,5 +32,7 @@ COPY config.py .
 COPY model.onnx .
 COPY images/ ./images/
 COPY configs/ ./configs/
+COPY sidecar.py .
+COPY test_sidecar.py .
 
 CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]

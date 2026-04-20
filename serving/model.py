@@ -3,19 +3,15 @@ import torchvision.models as models
 import torchvision.transforms as transforms
 from PIL import Image
 import os
-import random
 import mlflow
-import mlflow.pytorch 
-import numpy as np
-import onnxruntime as ort
-import cv2
+import mlflow.pytorch
+from mlflow.exceptions import RestException
 
 class Model:
 
     def __init__(self):
         # Pull model type and device from config to determine which inference engine to initialize
         from config import CONFIG 
-        self.model_type = CONFIG.get("model_type", "pytorch")
         self.device_type = CONFIG.get("device", "gpu")
         
         # Preprocessing
@@ -24,35 +20,67 @@ class Model:
             transforms.ToTensor(),
         ])
 
-        # Initialize the selected inferencing engine
-        if self.model_type == "onnx":
-            self._init_onnx()
-        else:
-            self._init_pytorch()
+        # Initilaize pytorch model by default
+        self._init_pytorch()
 
     def _init_pytorch(self):
-        mlflow.set_tracking_uri("http://129.114.25.247:8000")
+        mlflow.set_tracking_uri(
+            os.getenv(
+                "MLFLOW_TRACKING_URI",
+                "http://mlflow.bestshot-platform.svc.cluster.local:5000"
+            )
+        )
 
         from mlflow.tracking import MlflowClient
         client = MlflowClient()
-        version = client.get_model_version_by_alias("bestshot-iqa", "production")
-        #print(f"Loading model: bestshot-iqa version {latest.version} (run_id: {latest.run_id})")
-        print(f"Loading model: bestshot-iqa version {version.version} (run_id: {version.run_id})")
+        model_name = "bestshot-iqa"
+        alias = (
+            os.getenv("MLFLOW_MODEL_ALIAS", "").strip()
+            or os.getenv("MODEL_STAGE", "production").strip().lower()
+        )
+        load_uri = None
+        version = None
+        try:
+            version = client.get_model_version_by_alias(model_name, alias)
+            load_uri = f"models:/{model_name}@{alias}"
+            print(
+                f"Loading model: {model_name} alias={alias} "
+                f"version {version.version} (run_id: {version.run_id})"
+            )
+        except RestException as e:
+            err = str(e).lower()
+            if "alias" not in err and "not found" not in err:
+                raise
+            print(
+                f"WARNING: MLflow alias {alias!r} not found for {model_name} ({e}); "
+                "using latest registered version."
+            )
+            mvs = client.search_model_versions(f"name='{model_name}'")
+            if not mvs:
+                raise RuntimeError(
+                    f"No registered versions for {model_name} and alias {alias!r} missing. "
+                    "Set MLFLOW_MODEL_ALIAS to an existing alias or register the model in MLflow."
+                ) from e
+            version = max(mvs, key=lambda v: int(v.version))
+            load_uri = f"models:/{model_name}/{version.version}"
+            print(
+                f"Loading model: {model_name} version {version.version} "
+                f"(run_id: {version.run_id}) [fallback, no alias]"
+            )
 
-        self.model = mlflow.pytorch.load_model("models:/bestshot-iqa@production")
+        self.model = mlflow.pytorch.load_model(load_uri)
         self.model.eval()
 
-        # ROCm AMD GPU check — torch.cuda works for ROCm too but need to check differently
-        if self.device_type == "gpu":
-            if torch.cuda.is_available(): # is_rocm = torch.version.hip is not None
-                self.device = torch.device("cuda")
-            elif hasattr(torch, 'hip') and torch.hip.is_available():
-                self.device = torch.device("cuda")  # ROCm uses cuda device name
-            else:
-                print("WARNING: GPU requested but no GPU found, falling back to CPU")
-                self.device = torch.device("cuda") # mps? 
-        else:
+        # Respect explicit override first; otherwise use config with safe fallback.
+        device_override = os.getenv("DEVICE", "").strip().lower()
+        if device_override in {"cpu", "cuda"}:
+            self.device = torch.device(device_override)
+        elif self.device_type == "gpu" and torch.cuda.is_available():
+            # ROCm also uses "cuda" as the torch device name.
             self.device = torch.device("cuda")
+        else:
+            print("GPU unavailable or not requested, falling back to CPU")
+            self.device = torch.device("cpu")
 
         self.model.to(self.device)
         print(f"CUDA available: {torch.cuda.is_available()}")
@@ -139,51 +167,63 @@ class Model:
         score = 0.6 * sharpness_score + 0.4 * brightness_score
 
         return score.clamp(0, 10)
-
-    def _init_onnx(self):
-        # AMD-optimized ONNX setup
-        providers = ['ROCMExecutionProvider', 'CPUExecutionProvider'] if self.device_type == "gpu" else ['CPUExecutionProvider']
-        
-        # Load the frozen model file
-        self.session = ort.InferenceSession("model.onnx", providers=providers)
-        self.input_name = self.session.get_inputs()[0].name
-        print(f"ONNX active")
     
-    def load_images(self, image_paths):# Preprocesses images into a batch tensor, this is called by the predict method to prepare the input for inference
-        images = []
-        for path in image_paths:
-            if os.path.exists(path):
-                img = Image.open(path).convert("RGB")
-                img_tensor = self.transform(img)
-            else:
-                img_tensor = torch.randn(3, 300, 300)  # fallback for missing images
-            images.append(img_tensor)
-        return torch.stack(images)
 
-    def predict(self, image_paths):
-        x_tensor = self.load_images(image_paths)
+    def load_images(self, images):
+        #Accept either file paths or base64 image bytes, need to handle both for sidecar/ immich integration and testing with local files. Returns a batch tensor of shape (batch, 3, 300, 300) ready for model input.
+        tensors = []
+        for img in images:
+            try:
+                if isinstance(img, dict) and img.get("image_bytes"):
+                    # base64 encoded bytes from sidecar/Immich
+                    import base64
+                    from io import BytesIO
+                    raw = base64.b64decode(img["image_bytes"])
+                    pil_img = Image.open(BytesIO(raw)).convert("RGB")
+                    img_tensor = self.transform(pil_img)
+                elif isinstance(img, dict) and img.get("image_path"):
+                    path = img["image_path"]
+                    if os.path.exists(path):
+                        pil_img = Image.open(path).convert("RGB")
+                        img_tensor = self.transform(pil_img)
+                    else:
+                        img_tensor = torch.randn(3, 300, 300)
+                else:
+                    img_tensor = torch.randn(3, 300, 300)
+            except Exception as e:
+                print(f"[model] Error loading image: {e}")
+                img_tensor = torch.randn(3, 300, 300)
+            
+            tensors.append(img_tensor)
+        return torch.stack(tensors)
+
+    def predict(self, images): 
+        x_tensor = self.load_images(images)
         x_gpu = x_tensor.to(self.device)
 
-        print("Batch size:", len(image_paths))
+        print("Batch size:", len(images))
         print("Batch shape:", x_tensor.shape[0])
+        print("Input device:", x_gpu.device)
 
         with torch.no_grad():
-            raw_output = self.model(x_gpu)          # (batch,) koniq scores
-            sharpness_scores = self.compute_sharpness(x_gpu)   # (batch,)
-            exposure_scores  = self.compute_exposure(x_gpu)    # (batch,)
+            raw_output       = self.model(x_gpu)
+            sharpness_scores = self.compute_sharpness(x_gpu)
+            exposure_scores  = self.compute_exposure(x_gpu)
+            face_scores      = self.compute_face_quality(x_gpu)
 
         results = []
-        for i, path in enumerate(image_paths):
+        for i, img in enumerate(images): 
             koniq_score  = float(raw_output[i].item()) / 10.0
             sharpness    = float(sharpness_scores[i].item())
             exposure     = float(exposure_scores[i].item())
-            #face_quality = self.compute_face_quality(path)  # CPU, per image
-            face_quality = random.uniform(5.0, 10.0)
+            face_quality = float(face_scores[i].item())
 
             composite = (koniq_score  * 0.4 +
-                    sharpness    * 0.3 +
-                    exposure     * 0.2 +
-                    face_quality * 0.1)
+                        sharpness    * 0.3 +
+                        exposure     * 0.2 +
+                        face_quality * 0.1)
+
+            composite = max(0.0, min(composite, 10.0)) # ensure 0-10 range
 
             scores = {
                 "koniq_score":     float(round(koniq_score, 4)),
@@ -215,5 +255,4 @@ def load_model(): # Singleton pattern to ensure we only load the model once per 
     return _model_instance
 
 def predict_batch(model, images): # This function is called by the FastAPI endpoint, it extracts image paths and calls the model's predict method
-    image_paths = [img["image_path"] for img in images]
-    return model.predict(image_paths)
+    return model.predict(images)
