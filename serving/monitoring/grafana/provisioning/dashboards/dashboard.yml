@@ -1,0 +1,7 @@
+apiVersion: 1
+providers:
+  - name: BestShot
+    folder: BestShot
+    type: file
+    options:
+      path: /var/lib/grafana/dashboards
