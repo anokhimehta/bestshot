@@ -7,7 +7,7 @@ from datetime import datetime
 from dotenv import load_dotenv
 import swiftclient
 
-load_dotenv('/home/cc/bestshot/.env')
+load_dotenv()
 
 # Immich configuration
 IMMICH_URL = os.environ.get('IMMICH_URL', 'http://129.114.26.156:30283')
@@ -161,7 +161,6 @@ def main():
                     'user_id': user_id,
                     'action': action,
                     'timestamp': datetime.now().isoformat(),
-                    'confidence': 'explicit'
                 }
                 interactions.append(feedback_event)
 

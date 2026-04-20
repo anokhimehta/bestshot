@@ -1,9 +1,10 @@
+import sys
 import os
 import subprocess
 import swiftclient
 from dotenv import load_dotenv
 
-load_dotenv('/home/cc/bestshot/.env')
+load_dotenv()
 
 conn = swiftclient.Connection(
     auth_version='3',
@@ -30,8 +31,7 @@ print(f"Path: koniq10k/koniq10k_scores_and_distributions.csv")
 # Step 2 — Run data quality checks after ingestion
 print("\nRunning data quality checks on ingested data...")
 result = subprocess.run(
-    ['/home/cc/bestshot/venv/bin/python',
-     '/home/cc/bestshot/repo/data/ingestion/quality_checks.py'],
+    [sys.executable, 'data/ingestion/quality_checks.py'],
     capture_output=True,
     text=True
 )

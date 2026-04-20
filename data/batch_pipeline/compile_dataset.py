@@ -1,3 +1,4 @@
+import sys
 import os
 import json
 import csv
@@ -24,7 +25,7 @@ def get_latest_version(conn, bucket):
     except:
         return None
 
-load_dotenv('/home/cc/bestshot/.env')
+load_dotenv()
 
 conn = swiftclient.Connection(
     auth_version='3',
@@ -111,7 +112,7 @@ def candidate_selection(interactions, scores):
 
     # Add production photos with explicit labels
     for photo_id, actions in photo_actions.items():
-        explicit_actions = [a for a in actions if a.get('confidence') == 'explicit']
+        explicit_actions = [a for a in actions if 'action' in a]
         if explicit_actions:
             latest_action = explicit_actions[-1]
             label = 'low' if latest_action['action'] == 'delete' else 'high'
@@ -243,9 +244,8 @@ def main():
     import subprocess
     print("\nRunning training quality checks...")
     result = subprocess.run(
-        ['/home/cc/bestshot/venv/bin/python',
-         '/home/cc/bestshot/repo/data/batch_pipeline/training_quality_checks.py',
-         str(version)],
+    [sys.executable, 'data/batch_pipeline/training_quality_checks.py',
+     str(version)],
         capture_output=True,
         text=True
     )

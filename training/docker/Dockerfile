@@ -8,6 +8,6 @@ RUN apt-get update && apt-get install -y nvtop
 # Install Python dependencies
 RUN pip install --no-cache-dir --upgrade pip wheel setuptools
 
-COPY requirements.txt /tmp/requirements.txt
+COPY training/docker/requirements.txt /tmp/requirements.txt
 RUN pip install --no-cache-dir -r /tmp/requirements.txt \
     && rm /tmp/requirements.txt

@@ -1,0 +1,57 @@
+services:
+
+  # BestShot API
+  bestshot-api:
+    image: bestshot-serve
+    container_name: bestshot-api
+    network_mode: host
+    env_file: ../.env
+    environment:
+      - CONFIG_NAME=${CONFIG_NAME:-gpu_sequential}
+    devices:
+      - /dev/kfd
+      - /dev/dri
+    group_add:
+      - video
+    command: uvicorn app:app --host 0.0.0.0 --port 8000
+    restart: unless-stopped
+
+  # Prometheus for monitoring the BestShot API
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ../monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.console.libraries=/usr/share/prometheus/console_libraries"
+      - "--web.console.templates=/usr/share/prometheus/consoles"
+    networks:
+      - monitoring
+    restart: unless-stopped
+
+  # Grafana for visualizing Prometheus metrics
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=bestshot
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+    networks:
+      - monitoring
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+
+volumes:
+  prometheus_data:
+  grafana_data:

@@ -4,19 +4,15 @@
 
 # To make this script executeable and run it:
 #   chmod +x serving/test_feedback.sh
-#   ./serving/test_feedback.sh
+#   Start the BestShot API server (if not already running): ./run.sh gpu_sequential
+#   Then run this test script: ./serving/test_feedback.sh
 
 # Expected output:
-#   Server is up!
-#   Test 1: User keeps image model flagged as low quality...
-#       status: ok
-#   Test 2: User deletes image model scored as high quality...
-#       status: ok
-#   Test 3: User favorites an image...
-#       status: ok
-#   Test 4: Invalid action (should return error)...
-#       status: error — Invalid action. Must be one of: {'keep', 'delete', 'favorite'} 
-# ... Done!
+#   - Server health check passes (no ouput means success)
+#   - Tests 1-4: all return status: ok (feedback logged to Swift)
+#   - Test 5: returns error for invalid action
+#   - Test 6: returns error for invalid feature
+#   - Swift verification shows total entry count and last 3 logged entries
 
 
 BASE_URL="http://127.0.0.1:8000"
@@ -34,14 +30,15 @@ fi
 echo "Server is up!"
 echo ""
 
-# test 1 — keep (model said low quality, user disagreed)
-echo "Test 1: User keeps image model flagged as low quality..."
+# test 1 — deletion_suggestion: keep = negative feedback (disagreement)
+echo "Test 1: User keeps image model flagged for deletion (disagreement)..."
 curl -s -X POST $BASE_URL/feedback \
   -H "Content-Type: application/json" \
   -d '{
     "asset_id": "test-001",
     "photo_id": "test_img1.jpg",
     "user_id": "test_user",
+    "feature": "deletion_suggestion",
     "action": "keep",
     "prediction": {
       "quality_label": "low_quality",
@@ -51,31 +48,33 @@ curl -s -X POST $BASE_URL/feedback \
     }
   }' | python3 -c "import sys,json; r=json.load(sys.stdin); print(f'  status: {r[\"status\"]}')"
 
-# test 2 — delete (model said high quality, user disagreed)
-echo "Test 2: User deletes image model scored as high quality..."
+# test 2 — deletion_suggestion: delete = positive feedback (agreement)
+echo "Test 2: User deletes image model flagged for deletion (agreement)..."
 curl -s -X POST $BASE_URL/feedback \
   -H "Content-Type: application/json" \
   -d '{
     "asset_id": "test-002",
     "photo_id": "test_img2.jpg",
     "user_id": "test_user",
+    "feature": "deletion_suggestion",
     "action": "delete",
     "prediction": {
-      "quality_label": "high_quality",
-      "composite_score": 8.2,
-      "is_best_shot": true,
-      "review_flag": false
+      "quality_label": "low_quality",
+      "composite_score": 3.2,
+      "is_best_shot": false,
+      "review_flag": true
     }
   }' | python3 -c "import sys,json; r=json.load(sys.stdin); print(f'  status: {r[\"status\"]}')"
 
-# test 3 — favorite
-echo "Test 3: User favorites an image..."
+# test 3 — best_shot: favorite = positive feedback (agreement)
+echo "Test 3: User favorites image model flagged as best shot (agreement)..."
 curl -s -X POST $BASE_URL/feedback \
   -H "Content-Type: application/json" \
   -d '{
     "asset_id": "test-003",
     "photo_id": "test_img3.jpg",
     "user_id": "test_user",
+    "feature": "best_shot",
     "action": "favorite",
     "prediction": {
       "quality_label": "high_quality",
@@ -85,15 +84,46 @@ curl -s -X POST $BASE_URL/feedback \
     }
   }' | python3 -c "import sys,json; r=json.load(sys.stdin); print(f'  status: {r[\"status\"]}')"
 
-# test 4 — invalid action
-echo "Test 4: Invalid action (should return error)..."
+# test 4 — best_shot: delete = negative feedback (disagreement → retrain signal)
+echo "Test 4: User deletes image model flagged as best shot (disagreement)..."
 curl -s -X POST $BASE_URL/feedback \
   -H "Content-Type: application/json" \
   -d '{
     "asset_id": "test-004",
     "photo_id": "test_img4.jpg",
     "user_id": "test_user",
+    "feature": "best_shot",
+    "action": "delete",
+    "prediction": {
+      "quality_label": "high_quality",
+      "composite_score": 8.5,
+      "is_best_shot": true,
+      "review_flag": false
+    }
+  }' | python3 -c "import sys,json; r=json.load(sys.stdin); print(f'  status: {r[\"status\"]}')"
+
+# test 5 — invalid action
+echo "Test 5: Invalid action (should return error)..."
+curl -s -X POST $BASE_URL/feedback \
+  -H "Content-Type: application/json" \
+  -d '{
+    "asset_id": "test-005",
+    "photo_id": "test_img5.jpg",
+    "user_id": "test_user",
+    "feature": "best_shot",
     "action": "invalid_action"
+  }' | python3 -c "import sys,json; r=json.load(sys.stdin); print(f'  status: {r[\"status\"]} — {r.get(\"message\", \"\")}')"
+
+# test 6 — invalid feature
+echo "Test 6: Invalid feature (should return error)..."
+curl -s -X POST $BASE_URL/feedback \
+  -H "Content-Type: application/json" \
+  -d '{
+    "asset_id": "test-006",
+    "photo_id": "test_img6.jpg",
+    "user_id": "test_user",
+    "feature": "invalid_feature",
+    "action": "keep"
   }' | python3 -c "import sys,json; r=json.load(sys.stdin); print(f'  status: {r[\"status\"]} — {r.get(\"message\", \"\")}')"
 
 echo ""
@@ -116,11 +146,14 @@ conn = swiftclient.Connection(
 _, content = conn.get_object(os.getenv('BUCKET_NAME'), 'interactions_log.jsonl')
 lines = [l for l in content.decode().strip().split('\n') if l]
 print(f'Total entries in Swift: {len(lines)}')
-# show last 3
 print('Last 3 entries:')
 for line in lines[-3:]:
-    entry = json.loads(line)
-    print(f'  {entry[\"event_id\"]} | action={entry[\"action\"]} | score={entry[\"model_prediction\"][\"composite_score\"]}')
+    e = json.loads(line)
+    eid = e.get('event_id', '')
+    feat = e.get('feature', '')
+    act = e.get('action', '')
+    score = e.get('model_prediction', {}).get('composite_score', '')
+    print(f'  {eid} | feature={feat} | action={act} | score={score}')
 "
 
 echo ""

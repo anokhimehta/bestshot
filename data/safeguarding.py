@@ -6,7 +6,7 @@ from datetime import datetime
 import swiftclient
 from dotenv import load_dotenv
 
-load_dotenv('/home/cc/bestshot/.env')
+load_dotenv()
 
 conn = swiftclient.Connection(
     auth_version='3',
