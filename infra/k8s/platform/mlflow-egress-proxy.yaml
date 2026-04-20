@@ -23,6 +23,13 @@ spec:
           - "TCP:129.114.25.247:8000"
         ports:
         - containerPort: 18000
+        resources:
+          requests:
+            cpu: "50m"
+            memory: "64Mi"
+          limits:
+            cpu: "200m"
+            memory: "256Mi"
 ---
 apiVersion: v1
 kind: Service
