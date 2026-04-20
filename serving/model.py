@@ -31,7 +31,12 @@ class Model:
             self._init_pytorch()
 
     def _init_pytorch(self):
-        mlflow.set_tracking_uri("http://129.114.25.247:8000")
+        mlflow.set_tracking_uri(
+            os.getenv(
+                "MLFLOW_TRACKING_URI",
+                "http://mlflow.bestshot-platform.svc.cluster.local:5000"
+            )
+        )
 
         from mlflow.tracking import MlflowClient
         client = MlflowClient()
@@ -42,17 +47,16 @@ class Model:
         self.model = mlflow.pytorch.load_model("models:/bestshot-iqa@production")
         self.model.eval()
 
-        # ROCm AMD GPU check — torch.cuda works for ROCm too but need to check differently
-        if self.device_type == "gpu":
-            if torch.cuda.is_available(): # is_rocm = torch.version.hip is not None
-                self.device = torch.device("cuda")
-            elif hasattr(torch, 'hip') and torch.hip.is_available():
-                self.device = torch.device("cuda")  # ROCm uses cuda device name
-            else:
-                print("WARNING: GPU requested but no GPU found, falling back to CPU")
-                self.device = torch.device("cuda") # mps? 
-        else:
+        # Respect explicit override first; otherwise use config with safe fallback.
+        device_override = os.getenv("DEVICE", "").strip().lower()
+        if device_override in {"cpu", "cuda"}:
+            self.device = torch.device(device_override)
+        elif self.device_type == "gpu" and torch.cuda.is_available():
+            # ROCm also uses "cuda" as the torch device name.
             self.device = torch.device("cuda")
+        else:
+            print("GPU unavailable or not requested, falling back to CPU")
+            self.device = torch.device("cpu")
 
         self.model.to(self.device)
         print(f"CUDA available: {torch.cuda.is_available()}")

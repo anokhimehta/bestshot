@@ -29,6 +29,8 @@ spec:
           value: "CHI@TACC"
         - name: OS_AUTH_TYPE
           value: "v3applicationcredential"
+        - name: DEVICE
+          value: "cpu"
         envFrom:
         - secretRef:
             name: mlflow-credentials
