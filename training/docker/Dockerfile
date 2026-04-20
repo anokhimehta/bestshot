@@ -14,4 +14,4 @@ RUN pip install --no-cache-dir -r /tmp/requirements.txt \
 
 COPY training/ /app/training/
 COPY data/batch_pipeline/ /app/data/batch_pipeline/
-WORKDIR /app/training
+WORKDIR /app
