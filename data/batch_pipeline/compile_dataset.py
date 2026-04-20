@@ -55,28 +55,38 @@ def get_next_version():
         return 1
 
 def load_interactions():
-    """Load user interactions from object storage (supports both JSON and JSONL)"""
+    """Load user interactions from object storage (supports JSON, JSONL, and .jsonl file)"""
+    interactions = []
+    
+    # Try interactions_log.jsonl first (Lava's feedback endpoint)
     try:
-        _, content = conn.get_object(BUCKET, 'production/interactions_log.json')
+        _, content = conn.get_object(BUCKET, 'production/interactions_log.jsonl')
         decoded = content.decode('utf-8').strip()
-        
-        # Try JSON array first
-        if decoded.startswith('['):
-            interactions = json.loads(decoded)
-            print(f"Loaded {len(interactions)} interactions from JSON array")
-            return interactions
-        
-        # Try JSONL format
-        interactions = []
         for line in decoded.splitlines():
             line = line.strip()
             if line:
                 interactions.append(json.loads(line))
-        print(f"Loaded {len(interactions)} interactions from JSONL")
-        return interactions
+        print(f"Loaded {len(interactions)} interactions from interactions_log.jsonl")
     except:
+        pass
+    
+    # Also try interactions_log.json (data generator)
+    try:
+        _, content = conn.get_object(BUCKET, 'production/interactions_log.json')
+        decoded = content.decode('utf-8').strip()
+        if decoded.startswith('['):
+            entries = json.loads(decoded)
+        else:
+            entries = [json.loads(l) for l in decoded.splitlines() if l.strip()]
+        interactions.extend(entries)
+        print(f"Loaded {len(entries)} interactions from interactions_log.json")
+    except:
+        pass
+    
+    if not interactions:
         print("No interactions log found, using empty list")
-        return []
+    
+    return interactions
 
 def load_koniq_scores():
     """Load KonIQ-10k scores from object storage"""
