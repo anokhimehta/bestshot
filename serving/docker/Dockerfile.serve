@@ -34,5 +34,7 @@ COPY config.py .
 COPY model.onnx .
 COPY images/ ./images/
 COPY configs/ ./configs/
+COPY sidecar.py .
+COPY test_sidecar.py .
 
 CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]

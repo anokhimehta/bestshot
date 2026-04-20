@@ -149,41 +149,62 @@ class Model:
         self.input_name = self.session.get_inputs()[0].name
         print(f"ONNX active")
     
-    def load_images(self, image_paths):# Preprocesses images into a batch tensor, this is called by the predict method to prepare the input for inference
-        images = []
-        for path in image_paths:
-            if os.path.exists(path):
-                img = Image.open(path).convert("RGB")
-                img_tensor = self.transform(img)
-            else:
-                img_tensor = torch.randn(3, 300, 300)  # fallback for missing images
-            images.append(img_tensor)
-        return torch.stack(images)
 
-    def predict(self, image_paths):
-        x_tensor = self.load_images(image_paths)
+    def load_images(self, images):
+        #Accept either file paths or base64 image bytes, need to handle both for sidecar/ immich integration and testing with local files. Returns a batch tensor of shape (batch, 3, 300, 300) ready for model input.
+        tensors = []
+        for img in images:
+            try:
+                if isinstance(img, dict) and img.get("image_bytes"):
+                    # base64 encoded bytes from sidecar/Immich
+                    import base64
+                    from io import BytesIO
+                    raw = base64.b64decode(img["image_bytes"])
+                    pil_img = Image.open(BytesIO(raw)).convert("RGB")
+                    img_tensor = self.transform(pil_img)
+                elif isinstance(img, dict) and img.get("image_path"):
+                    path = img["image_path"]
+                    if os.path.exists(path):
+                        pil_img = Image.open(path).convert("RGB")
+                        img_tensor = self.transform(pil_img)
+                    else:
+                        img_tensor = torch.randn(3, 300, 300)
+                else:
+                    img_tensor = torch.randn(3, 300, 300)
+            except Exception as e:
+                print(f"[model] Error loading image: {e}")
+                img_tensor = torch.randn(3, 300, 300)
+            
+            tensors.append(img_tensor)
+        return torch.stack(tensors)
+
+    def predict(self, images):  # ← renamed from image_paths to images
+        x_tensor = self.load_images(images)
         x_gpu = x_tensor.to(self.device)
 
-        print("Batch size:", len(image_paths))
+        print("Batch size:", len(images))
         print("Batch shape:", x_tensor.shape[0])
+        print("Input device:", x_gpu.device)
 
         with torch.no_grad():
-            raw_output = self.model(x_gpu)          # (batch,) koniq scores
-            sharpness_scores = self.compute_sharpness(x_gpu)   # (batch,)
-            exposure_scores  = self.compute_exposure(x_gpu)    # (batch,)
+            raw_output       = self.model(x_gpu)
+            sharpness_scores = self.compute_sharpness(x_gpu)
+            exposure_scores  = self.compute_exposure(x_gpu)
 
         results = []
-        for i, path in enumerate(image_paths):
+        for i, img in enumerate(images):  # ← img not path
             koniq_score  = float(raw_output[i].item()) / 10.0
             sharpness    = float(sharpness_scores[i].item())
             exposure     = float(exposure_scores[i].item())
-            #face_quality = self.compute_face_quality(path)  # CPU, per image
-            face_quality = random.uniform(5.0, 10.0)
+            
+            # get path for face quality if available
+            path = img.get("image_path", "") if isinstance(img, dict) else ""
+            face_quality = random.uniform(5.0, 10.0)  # placeholder
 
             composite = (koniq_score  * 0.4 +
-                    sharpness    * 0.3 +
-                    exposure     * 0.2 +
-                    face_quality * 0.1)
+                        sharpness    * 0.3 +
+                        exposure     * 0.2 +
+                        face_quality * 0.1)
 
             scores = {
                 "koniq_score":     float(round(koniq_score, 4)),
@@ -215,5 +236,6 @@ def load_model(): # Singleton pattern to ensure we only load the model once per 
     return _model_instance
 
 def predict_batch(model, images): # This function is called by the FastAPI endpoint, it extracts image paths and calls the model's predict method
-    image_paths = [img["image_path"] for img in images]
-    return model.predict(image_paths)
+    '''image_paths = [img["image_path"] for img in images]
+    return model.predict(image_paths)''' 
+    return model.predict(images)
