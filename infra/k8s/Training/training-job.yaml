@@ -1,24 +1,24 @@
 # K8S manifest for Anokhi's training container
 # Dockerfile: https://github.com/anokhimehta/bestshot/blob/main/training/docker/Dockerfile
 apiVersion: batch/v1
-kind: Job
+kind: CronJob
 metadata:
   name: bestshot-training
   namespace: bestshot-platform
 spec:
-  template:
+  schedule: "0 3 * * *"
+  concurrencyPolicy: Forbid
+  jobTemplate:
     spec:
-      containers:
-      - name: training
-        image: ghcr.io/anokhimehta/bestshot-training:latest
-        resources:
-          requests:
-            cpu: "1000m"
-            memory: "4Gi"
-          limits:
-            cpu: "4000m"
-            memory: "16Gi"
-        env:
-        - name: MLFLOW_TRACKING_URI
-          value: "http://mlflow.bestshot-platform.svc.cluster.local:5000"
-      restartPolicy: Never
+      template:
+        spec:
+          containers:
+          - name: training
+            image: ghcr.io/anokhimehta/bestshot-training:latest
+            command: ["python", "training/train.py", "--config", "training/config/partial_finetune_highlr.yaml"]
+            envFrom:
+            - secretRef:
+                name: openstack-credentials
+            - secretRef:
+                name: mlflow-credentials
+          restartPolicy: Never
