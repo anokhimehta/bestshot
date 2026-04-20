@@ -3,20 +3,15 @@ import torchvision.models as models
 import torchvision.transforms as transforms
 from PIL import Image
 import os
-import random
 import mlflow
 import mlflow.pytorch
 from mlflow.exceptions import RestException
-import numpy as np
-import onnxruntime as ort
-import cv2
 
 class Model:
 
     def __init__(self):
         # Pull model type and device from config to determine which inference engine to initialize
         from config import CONFIG 
-        self.model_type = CONFIG.get("model_type", "pytorch")
         self.device_type = CONFIG.get("device", "gpu")
         
         # Preprocessing
@@ -25,11 +20,8 @@ class Model:
             transforms.ToTensor(),
         ])
 
-        # Initialize the selected inferencing engine
-        if self.model_type == "onnx":
-            self._init_onnx()
-        else:
-            self._init_pytorch()
+        # Initilaize pytorch model by default
+        self._init_pytorch()
 
     def _init_pytorch(self):
         mlflow.set_tracking_uri(
@@ -175,15 +167,6 @@ class Model:
         score = 0.6 * sharpness_score + 0.4 * brightness_score
 
         return score.clamp(0, 10)
-
-    def _init_onnx(self):
-        # AMD-optimized ONNX setup
-        providers = ['ROCMExecutionProvider', 'CPUExecutionProvider'] if self.device_type == "gpu" else ['CPUExecutionProvider']
-        
-        # Load the frozen model file
-        self.session = ort.InferenceSession("model.onnx", providers=providers)
-        self.input_name = self.session.get_inputs()[0].name
-        print(f"ONNX active")
     
 
     def load_images(self, images):
@@ -214,7 +197,7 @@ class Model:
             tensors.append(img_tensor)
         return torch.stack(tensors)
 
-    def predict(self, images):  # ← renamed from image_paths to images
+    def predict(self, images): 
         x_tensor = self.load_images(images)
         x_gpu = x_tensor.to(self.device)
 
@@ -226,21 +209,21 @@ class Model:
             raw_output       = self.model(x_gpu)
             sharpness_scores = self.compute_sharpness(x_gpu)
             exposure_scores  = self.compute_exposure(x_gpu)
+            face_scores      = self.compute_face_quality(x_gpu)
 
         results = []
-        for i, img in enumerate(images):  # ← img not path
+        for i, img in enumerate(images): 
             koniq_score  = float(raw_output[i].item()) / 10.0
             sharpness    = float(sharpness_scores[i].item())
             exposure     = float(exposure_scores[i].item())
-            
-            # get path for face quality if available
-            path = img.get("image_path", "") if isinstance(img, dict) else ""
-            face_quality = random.uniform(5.0, 10.0)  # placeholder
+            face_quality = float(face_scores[i].item())
 
             composite = (koniq_score  * 0.4 +
                         sharpness    * 0.3 +
                         exposure     * 0.2 +
                         face_quality * 0.1)
+
+            composite = max(0.0, min(composite, 10.0)) # ensure 0-10 range
 
             scores = {
                 "koniq_score":     float(round(koniq_score, 4)),
@@ -272,6 +255,4 @@ def load_model(): # Singleton pattern to ensure we only load the model once per 
     return _model_instance
 
 def predict_batch(model, images): # This function is called by the FastAPI endpoint, it extracts image paths and calls the model's predict method
-    '''image_paths = [img["image_path"] for img in images]
-    return model.predict(image_paths)''' 
     return model.predict(images)
