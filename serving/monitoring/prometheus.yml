@@ -6,5 +6,5 @@ scrape_configs:
   # scrape the BestShot FastAPI server
   - job_name: "bestshot"
     static_configs:
-      - targets: ["localhost:8000"]  # host network, so localhost works
+      - targets: ["10.52.2.226:8000"] # host network, so localhost works
     metrics_path: "/metrics"

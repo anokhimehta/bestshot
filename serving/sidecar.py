@@ -145,7 +145,57 @@ def add_to_album(asset_id: str, album_id: str):
     else:
         print(f"[sidecar] Failed to add to album: {resp.status_code}")
 
-# Serving helpers 
+
+def get_album_assets(album_id: str) -> set:
+    """Get current asset IDs in an album."""
+    if not album_id:
+        return set()
+    resp = requests.get(
+        f"{IMMICH_URL}/api/albums/{album_id}",
+        headers=HEADERS
+    )
+    if resp.status_code == 200:
+        assets = resp.json().get("assets", [])
+        return {a["id"] for a in assets}
+    return set()
+
+
+def send_feedback(asset_id: str, result: dict, action: str, feature: str):
+    """Send feedback to serving /feedback endpoint."""
+    payload = {
+        "prediction": result,
+        "action": action,
+        "feature": feature
+    }
+    try:
+        resp = requests.post(
+            f"{SERVING_URL}/feedback",
+            json=payload,
+            timeout=10
+        )
+        if resp.status_code == 200:
+            print(f"[sidecar] Feedback sent: asset={asset_id} action={action} feature={feature}")
+        else:
+            print(f"[sidecar] Feedback failed: {resp.status_code}")
+    except Exception as e:
+        print(f"[sidecar] Feedback error: {e}")
+
+
+def is_favorited(asset_id: str) -> bool:
+    """Check if an asset is favorited in Immich."""
+    try:
+        resp = requests.get(
+            f"{IMMICH_URL}/api/assets/{asset_id}",
+            headers=HEADERS
+        )
+        if resp.status_code == 200:
+            return resp.json().get("isFavorite", False)
+    except Exception as e:
+        print(f"[sidecar] Error checking favorite for {asset_id}: {e}")
+    return False
+
+
+# Serving helpers
 
 def score_image(asset_id: str, image_bytes: bytes) -> dict:
     """Send image bytes to serving /predict and get scores."""
@@ -198,6 +248,8 @@ def run():
     review_album_id     = get_or_create_album(REVIEW_ALBUM_NAME)
 
     processed_ids = set()
+    album_snapshots = {"best_shot": {}, "deletion_suggestion": {}}
+    favorited_ids = set()
     last_check = datetime.now(timezone.utc).isoformat()
 
     while True:
@@ -209,7 +261,7 @@ def run():
         for asset in assets:
             asset_id = asset.get("id")
 
-            if asset_id in processed_ids:  # ← skip already processed
+            if asset_id in processed_ids:
                 continue
 
             try:
@@ -228,16 +280,56 @@ def run():
                 # write score back to Immich
                 write_score_to_immich(asset_id, result)
 
-                # sort into albums
+                # sort into albums and track for feedback
                 if decisions.get("is_best_shot"):
                     add_to_album(asset_id, best_shots_album_id)
+                    album_snapshots["best_shot"][asset_id] = result
                 elif decisions.get("review_flag"):
                     add_to_album(asset_id, review_album_id)
-                
-                processed_ids.add(asset_id) # mark as processed after successful handling
+                    album_snapshots["deletion_suggestion"][asset_id] = result
+
+                processed_ids.add(asset_id)
 
             except Exception as e:
                 print(f"[sidecar] Error processing {asset_id}: {e}")
+
+        # Check for user feedback (assets removed from albums)
+        current_best = get_album_assets(best_shots_album_id)
+        current_review = get_album_assets(review_album_id)
+
+        # Best shots — asset removed = user deleted = negative feedback
+        for aid in list(album_snapshots["best_shot"].keys()):
+            if aid not in current_best:
+                send_feedback(aid, album_snapshots["best_shot"][aid], "delete", "best_shot")
+                del album_snapshots["best_shot"][aid]
+
+        # Review album — asset removed = user kept = negative feedback
+        for aid in list(album_snapshots["deletion_suggestion"].keys()):
+            if aid not in current_review:
+                send_feedback(aid, album_snapshots["deletion_suggestion"][aid], "keep", "deletion_suggestion")
+                del album_snapshots["deletion_suggestion"][aid]
+
+        # Update snapshots with current album contents
+        for aid in current_best:
+            if aid not in album_snapshots["best_shot"]:
+                album_snapshots["best_shot"][aid] = {}
+        for aid in current_review:
+            if aid not in album_snapshots["deletion_suggestion"]:
+                album_snapshots["deletion_suggestion"][aid] = {}
+
+        # Check for favorites in Best Shots album
+        print(f"[sidecar] Checking favorites for {len(current_best)} assets in Best Shots")
+        for aid in current_best:
+            if aid not in favorited_ids and is_favorited(aid):
+                send_feedback(aid, album_snapshots["best_shot"].get(aid, {}), "favorite", "best_shot")
+                favorited_ids.add(aid)
+
+        # Check for favorites in Review for Deletion album
+        print(f"[sidecar] Checking favorites for {len(current_review)} assets in Review")
+        for aid in current_review:
+            if aid not in favorited_ids and is_favorited(aid):
+                send_feedback(aid, album_snapshots["deletion_suggestion"].get(aid, {}), "favorite", "deletion_suggestion")
+                favorited_ids.add(aid)
 
         last_check = now
         print(f"[sidecar] Sleeping {POLL_INTERVAL}s...")

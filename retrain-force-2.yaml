@@ -1,0 +1,52 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  annotations:
+    cronjob.kubernetes.io/instantiate: manual
+  name: retrain-force-2
+  namespace: bestshot-platform
+  ownerReferences:
+  - apiVersion: batch/v1
+    controller: true
+    kind: CronJob
+    name: bestshot-retrain
+    uid: 714d78e9-c89b-420d-8cb9-375a097fb701
+spec:
+  template:
+    metadata: {}
+    spec:
+      containers:
+      - command:
+        - python
+        - /app/training/retrain.py
+        env:
+        - name: BUCKET_NAME
+          value: ak12754-data-proj19
+        envFrom:
+        - secretRef:
+            name: openstack-credentials
+        - secretRef:
+            name: mlflow-credentials
+        image: ghcr.io/anokhimehta/bestshot-training:latest
+        imagePullPolicy: IfNotPresent
+        name: retrain
+        resources:
+          limits:
+            cpu: "2"
+            memory: 6Gi
+          requests:
+            cpu: 500m
+            memory: 2Gi
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      dnsConfig:
+        nameservers:
+        - 1.1.1.1
+        - 8.8.8.8
+      dnsPolicy: ClusterFirstWithHostNet
+      hostNetwork: true
+      restartPolicy: OnFailure
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+status: {}

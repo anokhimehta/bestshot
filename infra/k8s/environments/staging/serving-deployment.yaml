@@ -30,7 +30,7 @@ spec:
         - name: OS_AUTH_TYPE
           value: "v3applicationcredential"
         - name: MLFLOW_MODEL_ALIAS
-          value: "production"
+          value: "staging"
         - name: DEVICE
           value: "cpu"
         envFrom:

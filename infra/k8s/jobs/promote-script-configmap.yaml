@@ -1,0 +1,81 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: promote-script
+  namespace: bestshot-platform
+data:
+  promote.py: |
+    #!/usr/bin/env python3
+    import os
+    import sys
+    import mlflow
+    from mlflow.tracking import MlflowClient
+
+    MLFLOW_URI = os.environ.get("MLFLOW_TRACKING_URI", "http://localhost:5000")
+    MODEL_NAME = "bestshot-iqa"
+    PLCC_THRESHOLD = float(os.environ.get("PLCC_THRESHOLD", "0.85"))
+    SRCC_THRESHOLD = float(os.environ.get("SRCC_THRESHOLD", "0.83"))
+
+    mlflow.set_tracking_uri(MLFLOW_URI)
+    client = MlflowClient()
+
+    def get_latest_version(stage):
+      versions = client.get_latest_versions(MODEL_NAME, stages=[stage])
+      return versions[0] if versions else None
+
+    def get_run_metrics(version):
+      run = client.get_run(version.run_id)
+      return run.data.metrics
+
+    def promote_staging_to_production():
+      staging = get_latest_version("Staging")
+      if not staging:
+        print("No model in Staging; nothing to promote")
+        return False
+
+      metrics = get_run_metrics(staging)
+      plcc = metrics.get("plcc", 0)
+      srcc = metrics.get("srcc", 0)
+      print(f"Staging model v{staging.version}: PLCC={plcc:.3f}, SRCC={srcc:.3f}")
+
+      if plcc >= PLCC_THRESHOLD and srcc >= SRCC_THRESHOLD:
+        current_prod = get_latest_version("Production")
+        if current_prod:
+          client.transition_model_version_stage(MODEL_NAME, current_prod.version, "Archived")
+          print(f"Archived Production v{current_prod.version}")
+
+        client.transition_model_version_stage(MODEL_NAME, staging.version, "Production")
+        print(f"Promoted v{staging.version} to Production")
+        return True
+
+      print("Model failed quality gates; not promoted")
+      return False
+
+    def rollback_production():
+      archived = client.search_model_versions(
+        f"name='{MODEL_NAME}' and current_stage='Archived'"
+      )
+      if not archived:
+        print("No archived versions available")
+        return False
+
+      latest_archived = sorted(archived, key=lambda v: int(v.version), reverse=True)[0]
+      current_prod = get_latest_version("Production")
+      if current_prod:
+        client.transition_model_version_stage(MODEL_NAME, current_prod.version, "Archived")
+        print(f"Archived failing production v{current_prod.version}")
+
+      client.transition_model_version_stage(MODEL_NAME, latest_archived.version, "Production")
+      print(f"Rolled back to version {latest_archived.version}")
+      return True
+
+    if __name__ == "__main__":
+      action = sys.argv[1] if len(sys.argv) > 1 else "promote"
+      if action == "promote":
+        ok = promote_staging_to_production()
+      elif action == "rollback":
+        ok = rollback_production()
+      else:
+        print(f"Unknown action: {action}")
+        sys.exit(1)
+      sys.exit(0 if ok else 1)

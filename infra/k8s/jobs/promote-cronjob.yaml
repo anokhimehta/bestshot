@@ -13,10 +13,22 @@ spec:
           containers:
           - name: promote
             image: ghcr.io/anokhimehta/bestshot-training:latest
+            resources:
+              requests:
+                cpu: "250m"
+                memory: "512Mi"
+              limits:
+                cpu: "2000m"
+                memory: "2Gi"
             command: ["python", "/scripts/promote.py", "promote"]
             envFrom:
             - secretRef:
                 name: mlflow-credentials
+            env:
+            - name: PLCC_THRESHOLD
+              value: "0.85"
+            - name: SRCC_THRESHOLD
+              value: "0.83"
             volumeMounts:
             - name: scripts
               mountPath: /scripts

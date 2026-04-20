@@ -110,6 +110,10 @@ jobs:
         echo "${{ secrets.KUBECONFIG_DATA }}" > ~/.kube/config
         chmod 600 ~/.kube/config
 
+    - name: Validate deploy secret
+      run: |
+        test -n "${{ secrets.KUBECONFIG_DATA }}" || (echo "Missing secret: KUBECONFIG_DATA" && exit 1)
+
     - name: Verify cluster connection
       run: kubectl get nodes
 
@@ -120,6 +124,9 @@ jobs:
 
     - name: Deploy app services (Immich)
       run: kubectl apply -f infra/k8s/app/
+
+    - name: Deploy features service
+      run: kubectl apply -f infra/k8s/data/features-deployment.yaml
 
     - name: Create namespaces
       run: |

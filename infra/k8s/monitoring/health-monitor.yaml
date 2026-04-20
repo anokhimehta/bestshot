@@ -41,6 +41,13 @@ spec:
           containers:
           - name: monitor
             image: python:3.12-slim
+            resources:
+              requests:
+                cpu: 50m
+                memory: 64Mi
+              limits:
+                cpu: 200m
+                memory: 256Mi
             command:
             - python
             - -c
@@ -54,7 +61,7 @@ spec:
 
               services = [
                   ("MLflow",      "http://mlflow.bestshot-platform.svc.cluster.local:5000/health"),
-                  ("Immich",      "http://immich-server.bestshot-app.svc.cluster.local:2283/api/server-info/ping"),
+                  ("Immich",      "http://immich-server.bestshot-app.svc.cluster.local:2283/api/server/ping"),
                   ("Serving-STG", "http://bestshot-serving-staging.bestshot-staging.svc.cluster.local:8000/health"),
                   ("Serving-PRD", "http://bestshot-serving-production.bestshot-production.svc.cluster.local:8000/health"),
                   ("Features",    "http://bestshot-features.bestshot-platform.svc.cluster.local:8000/health"),
