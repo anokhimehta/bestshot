@@ -13,6 +13,13 @@ spec:
           containers:
           - name: rollback
             image: ghcr.io/anokhimehta/bestshot-training:latest
+            resources:
+              requests:
+                cpu: "250m"
+                memory: "512Mi"
+              limits:
+                cpu: "2000m"
+                memory: "2Gi"
             envFrom:
             - secretRef:
                 name: mlflow-credentials
