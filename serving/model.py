@@ -5,7 +5,8 @@ from PIL import Image
 import os
 import random
 import mlflow
-import mlflow.pytorch 
+import mlflow.pytorch
+from mlflow.exceptions import RestException
 import numpy as np
 import onnxruntime as ort
 import cv2
@@ -40,11 +41,42 @@ class Model:
 
         from mlflow.tracking import MlflowClient
         client = MlflowClient()
-        version = client.get_model_version_by_alias("bestshot-iqa", "production")
-        #print(f"Loading model: bestshot-iqa version {latest.version} (run_id: {latest.run_id})")
-        print(f"Loading model: bestshot-iqa version {version.version} (run_id: {version.run_id})")
+        model_name = "bestshot-iqa"
+        alias = (
+            os.getenv("MLFLOW_MODEL_ALIAS", "").strip()
+            or os.getenv("MODEL_STAGE", "production").strip().lower()
+        )
+        load_uri = None
+        version = None
+        try:
+            version = client.get_model_version_by_alias(model_name, alias)
+            load_uri = f"models:/{model_name}@{alias}"
+            print(
+                f"Loading model: {model_name} alias={alias} "
+                f"version {version.version} (run_id: {version.run_id})"
+            )
+        except RestException as e:
+            err = str(e).lower()
+            if "alias" not in err and "not found" not in err:
+                raise
+            print(
+                f"WARNING: MLflow alias {alias!r} not found for {model_name} ({e}); "
+                "using latest registered version."
+            )
+            mvs = client.search_model_versions(f"name='{model_name}'")
+            if not mvs:
+                raise RuntimeError(
+                    f"No registered versions for {model_name} and alias {alias!r} missing. "
+                    "Set MLFLOW_MODEL_ALIAS to an existing alias or register the model in MLflow."
+                ) from e
+            version = max(mvs, key=lambda v: int(v.version))
+            load_uri = f"models:/{model_name}/{version.version}"
+            print(
+                f"Loading model: {model_name} version {version.version} "
+                f"(run_id: {version.run_id}) [fallback, no alias]"
+            )
 
-        self.model = mlflow.pytorch.load_model("models:/bestshot-iqa@production")
+        self.model = mlflow.pytorch.load_model(load_uri)
         self.model.eval()
 
         # Respect explicit override first; otherwise use config with safe fallback.
