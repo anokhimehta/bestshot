@@ -94,6 +94,10 @@ jobs:
     needs: build-and-push
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
+    env:
+      K3S_SSH_HOST: ${{ secrets.K3S_SSH_HOST }}
+      K3S_SSH_USER: ${{ secrets.K3S_SSH_USER }}
+      K3S_SSH_KEY: ${{ secrets.K3S_SSH_KEY }}
 
     steps:
     - name: Checkout repository
@@ -109,6 +113,33 @@ jobs:
         mkdir -p ~/.kube
         echo "${{ secrets.KUBECONFIG_DATA }}" > ~/.kube/config
         chmod 600 ~/.kube/config
+
+    - name: Validate deploy secrets
+      run: |
+        test -n "${K3S_SSH_HOST}" || (echo "Missing secret: K3S_SSH_HOST" && exit 1)
+        test -n "${K3S_SSH_USER}" || (echo "Missing secret: K3S_SSH_USER" && exit 1)
+        test -n "${K3S_SSH_KEY}" || (echo "Missing secret: K3S_SSH_KEY" && exit 1)
+
+    - name: Open SSH tunnel to K3s API
+      run: |
+        mkdir -p ~/.ssh
+        printf "%s" "${K3S_SSH_KEY}" > ~/.ssh/id_k3s_ci
+        chmod 600 ~/.ssh/id_k3s_ci
+        ssh-keyscan -H "${K3S_SSH_HOST}" >> ~/.ssh/known_hosts
+        ssh \
+          -i ~/.ssh/id_k3s_ci \
+          -o ExitOnForwardFailure=yes \
+          -o ServerAliveInterval=30 \
+          -o ServerAliveCountMax=3 \
+          -N -f \
+          -L 6443:127.0.0.1:6443 \
+          "${K3S_SSH_USER}@${K3S_SSH_HOST}"
+
+    - name: Point kubeconfig to local tunnel
+      run: |
+        CONTEXT_NAME="$(kubectl config current-context)"
+        CLUSTER_NAME="$(kubectl config view -o jsonpath="{.contexts[?(@.name==\"${CONTEXT_NAME}\")].context.cluster}")"
+        kubectl config set-cluster "${CLUSTER_NAME}" --server="https://127.0.0.1:6443" --insecure-skip-tls-verify=true
 
     - name: Verify cluster connection
       run: kubectl get nodes
