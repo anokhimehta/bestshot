@@ -12,30 +12,31 @@ spec:
         spec:
           containers:
           - name: rollback
-            image: python:3.12-slim
+            image: ghcr.io/anokhimehta/bestshot-training:latest
+            envFrom:
+            - secretRef:
+                name: mlflow-credentials
             command:
-            - python
-            - -c
+            - /bin/bash
+            - -lc
             - |
-              import urllib.request, os, subprocess, sys
+              set -euo pipefail
+              PROD_URL="http://bestshot-serving-production.bestshot-production.svc.cluster.local:8000/health"
+              if curl -fsS --max-time 10 "${PROD_URL}" >/dev/null; then
+                echo "Production health check passed"
+                exit 0
+              fi
 
-              # Check production health
-              prod_url = "http://bestshot-serving-production.bestshot-production.svc.cluster.local:8000/health"
-              try:
-                  req = urllib.request.urlopen(prod_url, timeout=10)
-                  data = req.read().decode()
-                  print(f"Production healthy: {data}")
-                  sys.exit(0)
-              except Exception as e:
-                  print(f"Production UNHEALTHY: {e}")
-                  print("Triggering rollback...")
-                  # Create rollback job
-                  import subprocess
-                  result = subprocess.run([
-                      "kubectl", "create", "job",
-                      "rollback-auto", "--from=cronjob/bestshot-retrain",
-                      "-n", "bestshot-platform"
-                  ], capture_output=True, text=True)
-                  print(result.stdout)
-                  print(result.stderr)
+              echo "Production health check failed, rolling back model"
+              python /scripts/promote.py rollback
+
+              kubectl rollout restart deployment/bestshot-serving-canary -n bestshot-canary
+              kubectl rollout restart deployment/bestshot-serving-production -n bestshot-production
+            volumeMounts:
+            - name: scripts
+              mountPath: /scripts
+          volumes:
+          - name: scripts
+            configMap:
+              name: promote-script
           restartPolicy: OnFailure

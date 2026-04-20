@@ -225,8 +225,14 @@ def main(config):
             run_id = mlflow.active_run().info.run_id
             mv = mlflow.register_model(f"runs:/{run_id}/model", "bestshot-iqa")
             client = mlflow.tracking.MlflowClient()
-            client.set_registered_model_alias("bestshot-iqa", "production", mv.version)
-            print("Model passed evaluation and has been registered.")
+            # New successful models land in Staging; promotion automation
+            # is responsible for moving them to Production.
+            client.transition_model_version_stage(
+                "bestshot-iqa",
+                mv.version,
+                "Staging"
+            )
+            print("Model passed evaluation and has been registered to Staging.")
         else:
             print(f"Did not pass quality gate (PLCC={eval_results['plcc']:.4f}, SRCC={eval_results['srcc']:.4f}) — not registered")
 

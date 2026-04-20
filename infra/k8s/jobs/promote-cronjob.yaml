@@ -17,6 +17,11 @@ spec:
             envFrom:
             - secretRef:
                 name: mlflow-credentials
+            env:
+            - name: PLCC_THRESHOLD
+              value: "0.85"
+            - name: SRCC_THRESHOLD
+              value: "0.83"
             volumeMounts:
             - name: scripts
               mountPath: /scripts
