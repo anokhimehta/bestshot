@@ -60,7 +60,7 @@ def load_interactions():
     
     # Try interactions_log.jsonl first (Lava's feedback endpoint)
     try:
-        _, content = conn.get_object(BUCKET, 'production/interactions_log.jsonl')
+        _, content = conn.get_object(BUCKET, 'interactions_log.jsonl')
         decoded = content.decode('utf-8').strip()
         for line in decoded.splitlines():
             line = line.strip()
