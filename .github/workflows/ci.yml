@@ -125,6 +125,9 @@ jobs:
     - name: Deploy app services (Immich)
       run: kubectl apply -f infra/k8s/app/
 
+    - name: Deploy features service
+      run: kubectl apply -f infra/k8s/data/features-deployment.yaml
+
     - name: Create namespaces
       run: |
         kubectl apply -f infra/k8s/environments/namespaces.yaml

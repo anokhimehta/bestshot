@@ -97,6 +97,7 @@ kubectl create secret generic immich-db-secret \
 info "Deploying platform, app, environments, monitoring, and jobs"
 kubectl apply -f "${ROOT_DIR}/infra/k8s/platform/"
 kubectl apply -f "${ROOT_DIR}/infra/k8s/app/"
+kubectl apply -f "${ROOT_DIR}/infra/k8s/data/features-deployment.yaml"
 kubectl apply -f "${ROOT_DIR}/infra/k8s/environments/staging/"
 kubectl apply -f "${ROOT_DIR}/infra/k8s/environments/canary/"
 kubectl apply -f "${ROOT_DIR}/infra/k8s/environments/production/"
