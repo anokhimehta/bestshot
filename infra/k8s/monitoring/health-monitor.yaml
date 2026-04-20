@@ -41,6 +41,13 @@ spec:
           containers:
           - name: monitor
             image: python:3.12-slim
+            resources:
+              requests:
+                cpu: 50m
+                memory: 64Mi
+              limits:
+                cpu: 200m
+                memory: 256Mi
             command:
             - python
             - -c
