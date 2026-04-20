@@ -23,6 +23,12 @@ spec:
           value: "Production"
         - name: ENVIRONMENT
           value: "production"
+        - name: BUCKET_NAME
+          value: "ak12754-data-proj19"
+        - name: OS_REGION_NAME
+          value: "CHI@TACC"
+        - name: OS_AUTH_TYPE
+          value: "v3applicationcredential"
         envFrom:
         - secretRef:
             name: mlflow-credentials
