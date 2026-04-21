@@ -199,7 +199,7 @@ def trigger_training_job():
     result = subprocess.run(
         [
             "kubectl", "create", "job", job_name,
-            "--from=cronjob/bestshot-retrain",
+            "--from=cronjob/bestshot-training",
             "-n", "bestshot-platform"
         ],
         capture_output=True,
