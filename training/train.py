@@ -191,14 +191,22 @@ def main(config):
     mlflow.set_experiment(config['experiment_name'])
     with mlflow.start_run():
         mlflow.log_params(config)
-        mlflow.log_param("gpu_name", torch.cuda.get_device_name(0))
-        mlflow.log_param("gpu_memory_gb", round(torch.cuda.get_device_properties(0).total_memory / 1e9, 2))
+        has_gpu = torch.cuda.is_available()
+        if has_gpu:
+            mlflow.log_param("gpu_name", torch.cuda.get_device_name(0))
+            mlflow.log_param("gpu_memory_gb", round(torch.cuda.get_device_properties(0).total_memory / 1e9, 2))
+        else:
+            mlflow.log_param("gpu_name", "none")
+            mlflow.log_param("gpu_memory_gb", 0)
         mlflow.log_param("dataset_version", dataset_version)
 
         model = BestShotModel(config)
+        accelerator = config.get('accelerator', 'gpu')
+        if accelerator == 'gpu' and not has_gpu:
+            accelerator = 'cpu'
         trainer = L.Trainer(
             max_epochs=config['epochs'],
-            accelerator=config.get('accelerator', 'gpu'),
+            accelerator=accelerator,
             devices=1,
             callbacks=[EpochTimingCallback()]
         )
@@ -219,7 +227,10 @@ def main(config):
         mlflow.log_metric("srcc", eval_results["srcc"])
         mlflow.log_metric("eval_n_samples", eval_results["n_samples"])
         mlflow.log_metric("training_time_seconds", time.time() - start)
-        mlflow.log_param("peak_vram_gb", round(torch.cuda.max_memory_allocated(0) / 1e9, 2))
+        if has_gpu:
+            mlflow.log_param("peak_vram_gb", round(torch.cuda.max_memory_allocated(0) / 1e9, 2))
+        else:
+            mlflow.log_param("peak_vram_gb", 0)
 
         if eval_results["passed"]:
             run_id = mlflow.active_run().info.run_id

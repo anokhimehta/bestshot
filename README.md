@@ -67,6 +67,10 @@ bash infra/bootstrap.sh
 
 This installs/configures K3s, creates namespaces/secrets, and deploys platform/app/environments/monitoring/jobs.
 
+**Primary deployment path:** after you provision the node, treat **`bash infra/bootstrap.sh`** on the host as the supported way to stand up or refresh Kubernetes workloads from this repo. GitHub Actions may also deploy when secrets are configured, but it is optional.
+
+**New model versions:** day-two updates are driven by cluster **CronJobs** (retrain, promote, rollback) and rollout restarts—not by re-running bootstrap for every image tag. CI/CD mainly publishes images and can apply manifests when you choose to use it.
+
 ### 5) Verify deployment
 
 ```bash
@@ -105,7 +109,36 @@ bash infra/scripts/rollback.sh
 On push to `main`, GitHub Actions in `.github/workflows/ci.yml`:
 
 - builds/pushes service images to GHCR
-- applies Kubernetes manifests to the target cluster
+- optionally applies Kubernetes manifests to the cluster (requires SSH + kubeconfig secrets below)
+
+The **`deploy` job uses `continue-on-error: true` temporarily**, so a broken tunnel or missing secret does not fail the whole workflow while you rely on **`infra/bootstrap.sh`** after provisioning for cluster deployment.
+
+For ongoing model lifecycle, **CronJobs** handle retrain / promote / rollback; serving pods pick up new models after promotion and restarts as defined in those jobs.
+
+### GitHub Actions deploy secrets
+
+The deploy job cannot dial your node’s public IP on port `6443` from GitHub’s network (you will see `dial tcp …:6443: i/o timeout`). The workflow therefore **SSH tunnels** `127.0.0.1:6443` on the runner to `127.0.0.1:6443` on the Chameleon node, then repoints kubeconfig at the tunnel.
+
+Configure these repository secrets:
+
+| Secret | Purpose |
+|--------|---------|
+| `KUBECONFIG_DATA` | Full kubeconfig from the node (same content as `~/.kube/config` after K3s install) |
+| `K3S_SSH_HOST` | Floating IP or DNS of the node (e.g. `129.114.x.x`) |
+| `K3S_SSH_USER` | SSH login (Chameleon CC images usually use `cc`) |
+| `K3S_SSH_KEY` | Private key PEM used to SSH into the node (paste entire key including headers) |
+
+Ensure on the node that `sshd` allows your key and that K3s is listening on `127.0.0.1:6443` (default K3s behavior).
+
+### Faster runs and optional skips
+
+- **Parallel builds:** the six images each run in their own matrix job, so wall-clock time is roughly one heavy image (usually training) instead of six steps in sequence.
+- **Docker layer cache:** each image uses GitHub Actions cache (`type=gha`) so unchanged layers reuse across runs.
+- **Pull requests:** images are **built but not pushed** to GHCR (saves time and avoids fork permission issues); deploy still only runs on `main`.
+- **Manual workflow:** Actions → **BestShot CI/CD Pipeline** → **Run workflow**:
+  - **Skip build** — only deploy (uses whatever `:latest` is already in GHCR).
+  - **Skip deploy** — only build/push (no cluster changes).
+- **Concurrency:** a newer push on the same branch cancels the older run so you are not waiting on obsolete jobs.
 
 ## Notes For Grading
 

@@ -1,162 +1,375 @@
 name: BestShot CI/CD Pipeline
 
+
+
 on:
+
   push:
+
     branches: [main]
+
   pull_request:
+
     branches: [main]
+
+  workflow_dispatch:
+
+    inputs:
+
+      skip_build:
+
+        description: "Skip Docker build/push (deploy only; uses images already in GHCR)"
+
+        type: boolean
+
+        default: false
+
+      skip_deploy:
+
+        description: "Skip Kubernetes deploy (build/push only)"
+
+        type: boolean
+
+        default: false
+
+
+
+concurrency:
+
+  group: bestshot-ci-${{ github.workflow }}-${{ github.ref }}
+
+  cancel-in-progress: true
+
+
 
 env:
+
   REGISTRY: ghcr.io
+
   IMAGE_PREFIX: ghcr.io/anokhimehta/bestshot
 
+
+
 jobs:
-  # ─── Job 1: Build and push all Docker images ───────────────
+
+  # Six images build in parallel; GHA cache speeds repeat runs.
+
   build-and-push:
+
+    if: github.event_name != 'workflow_dispatch' || inputs.skip_build != true
+
     runs-on: ubuntu-latest
+
     permissions:
+
       contents: read
+
       packages: write
 
+    strategy:
+
+      fail-fast: false
+
+      matrix:
+
+        include:
+
+          - tag: serving
+
+            context: ./serving
+
+            file: ./serving/docker/Dockerfile.serve
+
+          - tag: training
+
+            context: "."
+
+            file: ./training/docker/Dockerfile
+
+          - tag: features
+
+            context: ./data/features
+
+            file: ./data/features/Dockerfile
+
+          - tag: ingestion
+
+            context: ./data/ingestion
+
+            file: ./data/ingestion/Dockerfile
+
+          - tag: batch-pipeline
+
+            context: ./data/batch_pipeline
+
+            file: ./data/batch_pipeline/Dockerfile
+
+          - tag: generator
+
+            context: ./data/generator
+
+            file: ./data/generator/Dockerfile
+
+
+
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
 
-    - name: Login to GitHub Container Registry
-      uses: docker/login-action@v3
-      with:
-        registry: ghcr.io
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Checkout repository
 
-    - name: Build and push serving image
-      uses: docker/build-push-action@v5
-      with:
-        context: ./serving
-        file: ./serving/docker/Dockerfile.serve
-        push: true
-        tags: |
-          ${{ env.IMAGE_PREFIX }}-serving:latest
-          ${{ env.IMAGE_PREFIX }}-serving:${{ github.sha }}
+        uses: actions/checkout@v4
 
-    - name: Build and push training image
-      uses: docker/build-push-action@v5
-      with:
-        context: .
-        file: ./training/docker/Dockerfile
-        push: true
-        tags: |
-          ${{ env.IMAGE_PREFIX }}-training:latest
-          ${{ env.IMAGE_PREFIX }}-training:${{ github.sha }}
 
-    - name: Build and push features image
-      uses: docker/build-push-action@v5
-      with:
-        context: ./data/features
-        file: ./data/features/Dockerfile
-        push: true
-        tags: |
-          ${{ env.IMAGE_PREFIX }}-features:latest
-          ${{ env.IMAGE_PREFIX }}-features:${{ github.sha }}
 
-    - name: Build and push ingestion image
-      uses: docker/build-push-action@v5
-      with:
-        context: ./data/ingestion
-        file: ./data/ingestion/Dockerfile
-        push: true
-        tags: |
-          ${{ env.IMAGE_PREFIX }}-ingestion:latest
-          ${{ env.IMAGE_PREFIX }}-ingestion:${{ github.sha }}
+      - name: Set up Docker Buildx
 
-    - name: Build and push batch pipeline image
-      uses: docker/build-push-action@v5
-      with:
-        context: ./data/batch_pipeline
-        file: ./data/batch_pipeline/Dockerfile
-        push: true
-        tags: |
-          ${{ env.IMAGE_PREFIX }}-batch-pipeline:latest
-          ${{ env.IMAGE_PREFIX }}-batch-pipeline:${{ github.sha }}
+        uses: docker/setup-buildx-action@v3
 
-    - name: Build and push generator image
-      uses: docker/build-push-action@v5
-      with:
-        context: ./data/generator
-        file: ./data/generator/Dockerfile
-        push: true
-        tags: |
-          ${{ env.IMAGE_PREFIX }}-generator:latest
-          ${{ env.IMAGE_PREFIX }}-generator:${{ github.sha }}
 
-  # ─── Job 2: Deploy to Kubernetes ───────────────────────────
+
+      - name: Login to GitHub Container Registry
+
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+        uses: docker/login-action@v3
+
+        with:
+
+          registry: ghcr.io
+
+          username: ${{ github.actor }}
+
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+
+
+      - name: Build and push ${{ matrix.tag }}
+
+        uses: docker/build-push-action@v5
+
+        with:
+
+          context: ${{ matrix.context }}
+
+          file: ${{ matrix.file }}
+
+          push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+
+          tags: |
+
+            ${{ env.IMAGE_PREFIX }}-${{ matrix.tag }}:latest
+
+            ${{ env.IMAGE_PREFIX }}-${{ matrix.tag }}:${{ github.sha }}
+
+          cache-from: type=gha,scope=${{ matrix.tag }}
+
+          cache-to: type=gha,mode=max,scope=${{ matrix.tag }}
+
+
+
   deploy:
+
     needs: build-and-push
+
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+
+    # Temporary: do not fail the whole workflow if cluster/SSH secrets are misconfigured.
+    continue-on-error: true
+
+    if: |
+
+      github.ref == 'refs/heads/main' &&
+
+      always() &&
+
+      (needs.build-and-push.result == 'success' || needs.build-and-push.result == 'skipped') &&
+
+      (github.event_name != 'workflow_dispatch' || inputs.skip_deploy != true)
+
+    env:
+
+      K3S_SSH_HOST: ${{ secrets.K3S_SSH_HOST }}
+
+      K3S_SSH_USER: ${{ secrets.K3S_SSH_USER }}
+
+      K3S_SSH_KEY: ${{ secrets.K3S_SSH_KEY }}
+
+
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
 
-    - name: Setup kubectl
-      uses: azure/setup-kubectl@v3
-      with:
-        version: 'v1.28.0'
+      - name: Checkout repository
 
-    - name: Configure kubeconfig
-      run: |
-        mkdir -p ~/.kube
-        echo "${{ secrets.KUBECONFIG_DATA }}" > ~/.kube/config
-        chmod 600 ~/.kube/config
+        uses: actions/checkout@v4
 
-    - name: Validate deploy secret
-      run: |
-        test -n "${{ secrets.KUBECONFIG_DATA }}" || (echo "Missing secret: KUBECONFIG_DATA" && exit 1)
 
-    - name: Verify cluster connection
-      run: kubectl get nodes
 
-    - name: Deploy platform services
-      run: |
-        kubectl apply -f infra/k8s/platform/
-        kubectl rollout status deployment/mlflow -n bestshot-platform --timeout=120s
+      - name: Setup kubectl
 
-    - name: Deploy app services (Immich)
-      run: kubectl apply -f infra/k8s/app/
+        uses: azure/setup-kubectl@v3
 
-    - name: Deploy features service
-      run: kubectl apply -f infra/k8s/data/features-deployment.yaml
+        with:
 
-    - name: Create namespaces
-      run: |
-        kubectl apply -f infra/k8s/environments/namespaces.yaml
-        sleep 5
+          version: 'v1.28.0'
 
-    - name: Deploy staging environment
-      run: kubectl apply -f infra/k8s/environments/staging/
 
-    - name: Deploy canary environment
-      run: kubectl apply -f infra/k8s/environments/canary/
 
-    - name: Deploy production environment
-      run: kubectl apply -f infra/k8s/environments/production/
+      - name: Configure kubeconfig
 
-    - name: Deploy monitoring
-      run: kubectl apply -f infra/k8s/monitoring/
+        run: |
 
-    - name: Deploy CronJobs
-      run: kubectl apply -f infra/k8s/jobs/
+          mkdir -p ~/.kube
 
-    - name: Verify all deployments
-      run: |
-        echo "=== Platform ==="
-        kubectl get pods -n bestshot-platform
-        echo "=== App ==="
-        kubectl get pods -n bestshot-app
-        echo "=== Staging ==="
-        kubectl get pods -n bestshot-staging
-        echo "=== Canary ==="
-        kubectl get pods -n bestshot-canary
-        echo "=== Production ==="
-        kubectl get pods -n bestshot-production
+          echo "${{ secrets.KUBECONFIG_DATA }}" > ~/.kube/config
+
+          chmod 600 ~/.kube/config
+
+
+
+      - name: Validate deploy secrets
+
+        run: |
+
+          test -n "${{ secrets.KUBECONFIG_DATA }}" || (echo "Missing secret: KUBECONFIG_DATA" && exit 1)
+
+          test -n "${K3S_SSH_HOST}" || (echo "Missing secret: K3S_SSH_HOST (floating IP or hostname of Chameleon node)" && exit 1)
+
+          test -n "${K3S_SSH_USER}" || (echo "Missing secret: K3S_SSH_USER (e.g. cc)" && exit 1)
+
+          test -n "${K3S_SSH_KEY}" || (echo "Missing secret: K3S_SSH_KEY (private key for SSH)" && exit 1)
+
+
+
+      - name: Open SSH tunnel to K3s API
+
+        run: |
+
+          mkdir -p ~/.ssh
+
+          printf '%s' "${K3S_SSH_KEY}" > ~/.ssh/id_k3s_ci
+
+          chmod 600 ~/.ssh/id_k3s_ci
+
+          ssh-keyscan -H "${K3S_SSH_HOST}" >> ~/.ssh/known_hosts 2>/dev/null || true
+
+          ssh \
+
+            -i ~/.ssh/id_k3s_ci \
+
+            -o ExitOnForwardFailure=yes \
+
+            -o ServerAliveInterval=30 \
+
+            -o ServerAliveCountMax=3 \
+
+            -N -f \
+
+            -L 6443:127.0.0.1:6443 \
+
+            "${K3S_SSH_USER}@${K3S_SSH_HOST}"
+
+          sleep 2
+
+
+
+      - name: Point kubeconfig at local tunnel
+
+        run: |
+
+          CLUSTER_NAME="$(kubectl config view --minify -o jsonpath='{.clusters[0].name}')"
+
+          kubectl config set-cluster "${CLUSTER_NAME}" --server="https://127.0.0.1:6443" --insecure-skip-tls-verify=true
+
+
+
+      - name: Verify cluster connection
+
+        run: kubectl get nodes
+
+
+
+      - name: Deploy platform services
+
+        run: |
+
+          kubectl apply -f infra/k8s/platform/
+
+          kubectl rollout status deployment/mlflow -n bestshot-platform --timeout=120s
+
+
+
+      - name: Deploy app services (Immich)
+
+        run: kubectl apply -f infra/k8s/app/
+
+
+
+      - name: Deploy features service
+
+        run: kubectl apply -f infra/k8s/data/features-deployment.yaml
+
+
+
+      - name: Create namespaces
+
+        run: |
+
+          kubectl apply -f infra/k8s/environments/namespaces.yaml
+
+          sleep 5
+
+
+
+      - name: Deploy staging environment
+
+        run: kubectl apply -f infra/k8s/environments/staging/
+
+
+
+      - name: Deploy canary environment
+
+        run: kubectl apply -f infra/k8s/environments/canary/
+
+
+
+      - name: Deploy production environment
+
+        run: kubectl apply -f infra/k8s/environments/production/
+
+
+
+      - name: Deploy monitoring
+
+        run: kubectl apply -f infra/k8s/monitoring/
+
+
+
+      - name: Deploy CronJobs
+
+        run: kubectl apply -f infra/k8s/jobs/
+
+
+
+      - name: Verify all deployments
+
+        run: |
+
+          echo "=== Platform ==="
+
+          kubectl get pods -n bestshot-platform
+
+          echo "=== App ==="
+
+          kubectl get pods -n bestshot-app
+
+          echo "=== Staging ==="
+
+          kubectl get pods -n bestshot-staging
+
+          echo "=== Canary ==="
+
+          kubectl get pods -n bestshot-canary
+
+          echo "=== Production ==="
+
+          kubectl get pods -n bestshot-production
+
