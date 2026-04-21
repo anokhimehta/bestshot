@@ -195,25 +195,39 @@ def trigger_training_job():
     latest dataset version from Swift.
     """
     print("\n--- Step 3: Triggering training Job ---")
-    job_name = f"bestshot-training-{datetime.now().strftime('%Y%m%d%H%M%S')}"
 
-    create_result = subprocess.run(
-        [
-            "kubectl", "create", "job", job_name,
-            "--from=cronjob/bestshot-training",
-            "-n", "bestshot-platform"
-        ],
-        capture_output=True,
-        text=True
-    )
+    result = subprocess.run([
+        "docker", "run", "--rm",
+        "--device=/dev/kfd", "--device=/dev/dri", "--group-add", "video",
+        "--network", "host",
+        "--shm-size=8g",
+        "--env-file", "/home/cc/bestshot/training/.env",
+        "ghcr.io/anokhimehta/bestshot-training:latest",
+        "python", "training/train.py", "--config", "training/config/partial_finetune_highlr.yaml"
+    ])
+    if result.returncode != 0:
+        raise RuntimeError(f"docker run failed with exit code {result.returncode}")
+    print("Training job completed successfully")
+    
+    # job_name = f"bestshot-training-{datetime.now().strftime('%Y%m%d%H%M%S')}"
 
-    if create_result.returncode != 0:
-        raise RuntimeError(f"kubectl create failed: {create_result.stderr}")
+    # create_result = subprocess.run(
+    #     [
+    #         "kubectl", "create", "job", job_name,
+    #         "--from=cronjob/bestshot-training",
+    #         "-n", "bestshot-platform"
+    #     ],
+    #     capture_output=True,
+    #     text=True
+    # )
 
-    print(f"Launched training job: {job_name}")
-    print(create_result.stdout)
-    print("Patched job command to run train.py")
-    return job_name
+    # if create_result.returncode != 0:
+    #     raise RuntimeError(f"kubectl create failed: {create_result.stderr}")
+
+    # print(f"Launched training job: {job_name}")
+    # print(create_result.stdout)
+    # print("Patched job command to run train.py")
+    # return job_name
 
 
 def main():
