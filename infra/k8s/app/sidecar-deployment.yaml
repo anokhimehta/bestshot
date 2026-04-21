@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bestshot-sidecar
+  namespace: bestshot-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: bestshot-sidecar
+  template:
+    metadata:
+      labels:
+        app: bestshot-sidecar
+    spec:
+      containers:
+      - name: sidecar
+        image: ghcr.io/anokhimehta/bestshot-serving:latest
+        command: ["python", "-u", "sidecar.py"]
+        env:
+        - name: IMMICH_URL
+          value: "http://immich-server.bestshot-app.svc.cluster.local:2283"
+        - name: SERVING_URL
+          value: "http://bestshot-serving-production.bestshot-production.svc.cluster.local:8000"
+        - name: POLL_INTERVAL
+          value: "30"
+        envFrom:
+        - secretRef:
+            name: immich-sidecar-secret
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "256Mi"
+          limits:
+            cpu: "500m"
+            memory: "1Gi"

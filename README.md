@@ -56,6 +56,7 @@ export OS_APPLICATION_CREDENTIAL_SECRET="<secret>"
 export OS_REGION_NAME="CHI@TACC"
 export BUCKET_NAME="<swift_bucket>"
 export IMMICH_DB_PASSWORD="<db_password>"
+export IMMICH_API_KEY="<immich_api_key>"
 export MLFLOW_TRACKING_URI="http://<FLOATING_IP>:30500"
 ```
 
@@ -76,9 +77,22 @@ This installs/configures K3s, creates namespaces/secrets, and deploys platform/a
 ```bash
 kubectl get pods --all-namespaces
 kubectl get cronjobs -n bestshot-platform
+kubectl get pods -n bestshot-app
 ```
 
 ## Model Promotion and Rollback
+
+## Immich Sidecar Automation
+
+The sidecar integration in `serving/sidecar.py` is deployed as Kubernetes `Deployment`
+`infra/k8s/app/sidecar-deployment.yaml` in namespace `bestshot-app`.
+
+It continuously:
+
+- polls Immich for new assets,
+- calls the serving API for scoring,
+- writes score metadata back to Immich,
+- sends user-action feedback to `/feedback` for retraining signals.
 
 ### Automated promotion
 

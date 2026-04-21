@@ -14,6 +14,7 @@ required_env=(
   OS_REGION_NAME
   BUCKET_NAME
   IMMICH_DB_PASSWORD
+  IMMICH_API_KEY
   MLFLOW_TRACKING_URI
 )
 
@@ -92,6 +93,10 @@ kubectl create secret generic immich-db-secret \
   --from-literal=DB_PASSWORD="${IMMICH_DB_PASSWORD}" \
   --from-literal=DB_USERNAME=immich \
   --from-literal=DB_DATABASE_NAME=immich \
+  -n bestshot-app --dry-run=client -o yaml | kubectl apply -f -
+
+kubectl create secret generic immich-sidecar-secret \
+  --from-literal=IMMICH_API_KEY="${IMMICH_API_KEY}" \
   -n bestshot-app --dry-run=client -o yaml | kubectl apply -f -
 
 info "Deploying platform, app, environments, monitoring, and jobs"
