@@ -197,7 +197,7 @@ def trigger_training_job():
     print("\n--- Step 3: Triggering training Job ---")
 
     result = subprocess.run([
-        "docker", "run", "--rm",
+        "/usr/bin/docker", "run", "--rm",
         "--device=/dev/kfd", "--device=/dev/dri", "--group-add", "video",
         "--network", "host",
         "--shm-size=8g",
@@ -208,7 +208,7 @@ def trigger_training_job():
     if result.returncode != 0:
         raise RuntimeError(f"docker run failed with exit code {result.returncode}")
     print("Training job completed successfully")
-    
+
     # job_name = f"bestshot-training-{datetime.now().strftime('%Y%m%d%H%M%S')}"
 
     # create_result = subprocess.run(
