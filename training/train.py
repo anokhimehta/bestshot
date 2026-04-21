@@ -223,19 +223,53 @@ def main(config):
 
         if eval_results["passed"]:
             run_id = mlflow.active_run().info.run_id
-            mv = mlflow.register_model(f"runs:/{run_id}/model", "bestshot-iqa")
             client = mlflow.tracking.MlflowClient()
-            # New successful models land in Staging; promotion automation
-            # is responsible for moving them to Production.
-            client.transition_model_version_stage(
-                "bestshot-iqa",
-                mv.version,
-                "Staging"
-            )
-            print("Model passed evaluation and has been registered to Staging.")
-        else:
-            print(f"Did not pass quality gate (PLCC={eval_results['plcc']:.4f}, SRCC={eval_results['srcc']:.4f}) — not registered")
+            
+            #regression detection
+            regression_detected = False
+            try:
+                prod_versions = client.get_latest_versions("bestshot-iqa", stages=["Production"])
+                if prod_versions:
+                    prod_run_id = prod_versions[0].run_id
+                    prod_metrics = client.get_run(prod_run_id).data.metrics
+                    prod_plcc = prod_metrics.get("plcc", 0.0)
+                    prod_srcc = prod_metrics.get("srcc", 0.0)
+                    new_plcc = eval_results["plcc"]
+                    new_srcc = eval_results["srcc"]
+ 
+                    mlflow.log_metric("prod_plcc_at_train_time", prod_plcc)
+                    mlflow.log_metric("prod_srcc_at_train_time", prod_srcc)
+ 
+                    # Allow up to 0.01 drop before treating as regression
+                    if new_plcc < prod_plcc - 0.01 or new_srcc < prod_srcc - 0.01:
+                        regression_detected = True
+                        mlflow.set_tag("promotion_status", "rejected_regression")
+                        print(
+                            f"Regression detected — new model "
+                            f"(PLCC={new_plcc:.4f}, SRCC={new_srcc:.4f}) is worse than "
+                            f"production (PLCC={prod_plcc:.4f}, SRCC={prod_srcc:.4f}). "
+                            f"Not registering."
+                        )
+                else:
+                    print("No Production model found — skipping regression check.")
+            except Exception as e:
+                print(f"Regression check failed with error: {e} — proceeding with registration.")
 
+
+            if not regression_detected:
+                mv = mlflow.register_model(f"runs:/{run_id}/model", "bestshot-iqa")
+                # New successful models land in Staging; promotion automation
+                # is responsible for moving them to Production.
+                client.transition_model_version_stage(
+                    "bestshot-iqa",
+                    mv.version,
+                    "Staging"
+                )
+                mlflow.set_tag("promotion_status", "approved")
+                print("Model passed evaluation and regression check — registered to Staging.")
+        else:
+            mlflow.set_tag("promotion_status", "rejected_quality_gate")
+            print(f"Did not pass quality gate (PLCC={eval_results['plcc']:.4f}, SRCC={eval_results['srcc']:.4f}) — not registered")
 
 
 
