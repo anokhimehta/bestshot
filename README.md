@@ -94,6 +94,33 @@ It continuously:
 - writes score metadata back to Immich,
 - sends user-action feedback to `/feedback` for retraining signals.
 
+### Retraining triggers
+
+`retrain.py` checks three conditions before triggering a retrain. Any one being true is sufficient:
+
+| Condition | Threshold | Rationale |
+|-----------|-----------|-----------|
+| New interaction events | ≥ 500 since last retrain | Ensures enough new data to improve the model |
+| Days elapsed | ≥ 7 days | Time-based safety net for low-traffic periods |
+| Negative feedback rate | ≥ 40% over ≥ 50 events | Signals model is actively failing users |
+
+The minimum 50-event floor on negative feedback rate prevents retraining on statistically insignificant signals — a 60% negative rate from 5 users is noise, not a reliable signal.
+
+### Quality gates and regression detection
+
+After every training run, `train.py` evaluates the model on a held-out test set and applies two gates before registering to the MLflow Model Registry:
+
+1. **Absolute quality gate** — model must meet minimum thresholds (PLCC ≥ 0.85, SRCC ≥ 0.83)
+2. **Regression check** — model must not be more than 0.01 worse than the currently deployed Production model on either metric
+
+Every run is tagged with a `promotion_status` in MLflow:
+
+| Tag value | Meaning |
+|-----------|---------|
+| `approved` | Passed both gates, registered to Staging |
+| `rejected_quality_gate` | Did not meet absolute thresholds |
+| `rejected_regression` | Passed absolute thresholds but worse than Production |
+
 ### Automated promotion
 
 `infra/k8s/jobs/promote-cronjob.yaml` runs nightly:
