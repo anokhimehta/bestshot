@@ -31,6 +31,37 @@ kubectl get cronjobs -n bestshot-platform
 kubectl get pods -n bestshot-app
 ```
 
+## Immich Sidecar Automation
+
+The sidecar integration in `serving/sidecar.py` is deployed as Kubernetes `Deployment`
+(`infra/k8s/app/sidecar-deployment.yaml`), side-by-side with Immich and BestShot services.
+It continuously:
+
+- reads image metadata/events from Immich,
+- computes quality scores through the serving endpoint,
+- writes score metadata back to Immich,
+- sends user-action feedback to `/feedback` for retraining signals.
+
+### Retraining triggers
+
+`retrain.py` checks three conditions before triggering a retrain. Any one being true is sufficient:
+
+- New interaction events: >= 500 since last retrain
+- Days elapsed: >= 7 days
+- Negative feedback rate: >= 40% over >= 50 events
+
+### Automated promotion and rollback
+
+`infra/k8s/jobs/promote-cronjob.yaml` runs nightly to move qualified models from Staging to Production.
+`infra/k8s/jobs/rollback-cronjob.yaml` checks production health and restores a previous model when required.
+
+Manual commands (if needed):
+
+```bash
+bash infra/scripts/promote.sh
+bash infra/scripts/rollback.sh
+```
+
 ## Runbook (Quick Recovery)
 
 Use this when you need to recreate or refresh the environment on CHI@TACC.
