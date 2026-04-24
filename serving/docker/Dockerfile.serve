@@ -2,10 +2,16 @@ FROM rocm/pytorch:rocm6.2_ubuntu22.04_py3.10_pytorch_release_2.3.0
 
 WORKDIR /app
 
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel
+
+# Install PyTorch ROCm wheels explicitly.
 RUN pip install --no-cache-dir \
     --extra-index-url https://download.pytorch.org/whl/rocm6.2 \
     torch==2.5.1+rocm6.2 \
-    torchvision==0.20.1+rocm6.2 \
+    torchvision==0.20.1+rocm6.2
+
+# Install generic Python dependencies.
+RUN pip install --no-cache-dir \
     fastapi \
     uvicorn \
     onnx \
@@ -20,9 +26,11 @@ RUN pip install --no-cache-dir \
     prometheus-client \
     timm \
     opencv-python-headless \
-    onnxruntime-rocm \
     mlflow \
     lightning
+
+# Prefer ROCm runtime, but fall back to CPU runtime if wheel is unavailable.
+RUN pip install --no-cache-dir onnxruntime-rocm || pip install --no-cache-dir onnxruntime
 
 COPY app.py .
 COPY model.py .
