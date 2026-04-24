@@ -43,9 +43,11 @@ mkdir -p "${HOME}/.kube"
 sudo cp /etc/rancher/k3s/k3s.yaml "${HOME}/.kube/config"
 sudo chown "${USER}:${USER}" "${HOME}/.kube/config"
 chmod 600 "${HOME}/.kube/config"
+# Force kubectl to use user kubeconfig (avoids /etc/rancher permission errors)
+unset KUBECONFIG
 export KUBECONFIG="${HOME}/.kube/config"
-if ! rg -q "KUBECONFIG=~/.kube/config" "${HOME}/.bashrc" 2>/dev/null; then
-  echo 'export KUBECONFIG=~/.kube/config' >> "${HOME}/.bashrc"
+if ! rg -q "KUBECONFIG=\\$HOME/.kube/config" "${HOME}/.bashrc" 2>/dev/null; then
+  echo 'export KUBECONFIG=$HOME/.kube/config' >> "${HOME}/.bashrc"
 fi
 
 kubectl get nodes >/dev/null
