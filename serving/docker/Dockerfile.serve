@@ -4,11 +4,8 @@ WORKDIR /app
 
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel
 
-# Install PyTorch ROCm wheels explicitly.
-RUN pip install --no-cache-dir \
-    --extra-index-url https://download.pytorch.org/whl/rocm6.2 \
-    torch==2.5.1+rocm6.2 \
-    torchvision==0.20.1+rocm6.2
+# Keep torch/torchvision from the ROCm base image to avoid CI wheel resolution failures.
+RUN python -c "import torch, torchvision; print('torch', torch.__version__, 'torchvision', torchvision.__version__)"
 
 # Install generic Python dependencies.
 RUN pip install --no-cache-dir \
