@@ -70,6 +70,9 @@ jobs:
 
       fail-fast: false
 
+      # Serialize matrix builds to avoid filling the runner disk (ROCm serving + full-repo training are huge).
+      max-parallel: 1
+
       matrix:
 
         include:
@@ -114,12 +117,7 @@ jobs:
 
     steps:
 
-      - name: Checkout repository
-
-        uses: actions/checkout@v4
-
-
-
+      # Run before checkout so clearing _work does not delete this job's workspace.
       - name: Free runner disk space
 
         run: |
@@ -128,7 +126,10 @@ jobs:
 
           df -h
 
-          # Best effort cleanup for self-hosted runners that keep state across jobs.
+          # Hosted ubuntu-latest: remove large preinstalled SDKs (~6–10 GB) so Docker builds have room.
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL || true
+
+          # Best effort cleanup for runners that keep Docker state across jobs.
           docker system prune -af --volumes || true
 
           docker builder prune -af || true
@@ -137,9 +138,18 @@ jobs:
 
           sudo rm -rf /var/tmp/* || true
 
+          # Self-hosted runners: old job workspaces + rotated diag logs (must run before checkout).
+          sudo rm -rf /home/runner/actions-runner/_work/* || true
+
+          sudo find /home/runner/actions-runner -type f -path '*/_diag/*.log' -mtime +0 -delete 2>/dev/null || true
+
           echo "Disk usage after cleanup:"
 
           df -h
+
+      - name: Checkout repository
+
+        uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
 
@@ -183,7 +193,8 @@ jobs:
 
           cache-from: type=gha,scope=${{ matrix.tag }}
 
-          cache-to: type=gha,mode=max,scope=${{ matrix.tag }}
+          # mode=min avoids huge cache export layers that can fill the runner during parallel builds.
+          cache-to: type=gha,mode=min,scope=${{ matrix.tag }}
 
 
 
