@@ -277,9 +277,43 @@ jobs:
 
           mkdir -p ~/.ssh
 
-          printf '%s' "${K3S_SSH_KEY}" > ~/.ssh/id_k3s_ci
+          # Normalize secret formats:
+          # 1) raw multiline private key
+          # 2) key with literal '\n' sequences
+          # 3) base64-encoded private key
+          python3 - <<'PY'
+          import base64
+          import os
+          from pathlib import Path
+
+          raw = os.environ["K3S_SSH_KEY"].strip()
+
+          key = raw
+          if "\\n" in key and "BEGIN" in key:
+              key = key.replace("\\n", "\n")
+
+          if "BEGIN" not in key:
+              try:
+                  decoded = base64.b64decode(raw).decode("utf-8")
+                  if "BEGIN" in decoded:
+                      key = decoded
+              except Exception:
+                  pass
+
+          if "BEGIN" not in key or "PRIVATE KEY" not in key:
+              raise SystemExit("K3S_SSH_KEY is not a valid private key format (raw, escaped \\n, or base64).")
+
+          out = Path.home() / ".ssh" / "id_k3s_ci"
+          out.write_text(key if key.endswith("\n") else key + "\n", encoding="utf-8")
+          PY
+
+          # Remove CRLF in case the secret was pasted from Windows.
+          sed -i 's/\r$//' ~/.ssh/id_k3s_ci
 
           chmod 600 ~/.ssh/id_k3s_ci
+
+          # Fail fast with a clear message if key parsing still fails.
+          ssh-keygen -y -f ~/.ssh/id_k3s_ci >/dev/null
 
           ssh-keyscan -H "${K3S_SSH_HOST}" >> ~/.ssh/known_hosts 2>/dev/null || true
 
