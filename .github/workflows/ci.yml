@@ -52,7 +52,7 @@ env:
 
 jobs:
 
-  # Six images build in parallel; GHA cache speeds repeat runs.
+  # Six Images are built in parallel; GHA cache speeds repeat runs.
 
   build-and-push:
 
