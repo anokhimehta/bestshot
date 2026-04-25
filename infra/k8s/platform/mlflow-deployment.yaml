@@ -19,12 +19,22 @@ spec:
       - name: mlflow
         image: ghcr.io/mlflow/mlflow:v2.10.0
         command:
-          - mlflow
-          - server
-          - --backend-store-uri=sqlite:///mlflow/mlflow.db
-          - --default-artifact-root=/mlflow/artifacts
-          - --host=0.0.0.0
-          - --port=5000
+          - /bin/sh
+          - -c
+          - >
+            pip install --no-cache-dir psycopg2-binary boto3 &&
+            mlflow server
+            --backend-store-uri postgresql://user:password@postgres/mlflowdb
+            --artifacts-destination s3://proj19-mlflow-artifacts/
+            --serve-artifacts
+            --host 0.0.0.0
+            --port 5000
+        env:
+        - name: MLFLOW_S3_ENDPOINT_URL
+          value: https://chi.tacc.chameleoncloud.org:7480
+        envFrom:
+        - secretRef:
+            name: mlflow-artifact-credentials
         ports:
         - containerPort: 5000
         resources:
@@ -34,10 +44,3 @@ spec:
           limits:
             cpu: "1000m"
             memory: "2Gi"
-        volumeMounts:
-        - name: mlflow-storage
-          mountPath: /mlflow
-      volumes:
-      - name: mlflow-storage
-        persistentVolumeClaim:
-          claimName: mlflow-pvc

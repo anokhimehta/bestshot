@@ -101,3 +101,8 @@ kubectl create secret generic openstack-credentials \
   --from-literal=OS_APPLICATION_CREDENTIAL_ID=<id> \
   --from-literal=OS_APPLICATION_CREDENTIAL_SECRET=<secret> \
   -n bestshot-platform
+
+kubectl create secret generic mlflow-artifact-credentials \
+  --from-literal=AWS_ACCESS_KEY_ID=<s3_access_key> \
+  --from-literal=AWS_SECRET_ACCESS_KEY=<s3_secret_key> \
+  -n bestshot-platform

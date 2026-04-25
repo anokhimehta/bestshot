@@ -13,6 +13,8 @@ required_env=(
   OS_APPLICATION_CREDENTIAL_SECRET
   OS_REGION_NAME
   BUCKET_NAME
+  AWS_ACCESS_KEY_ID
+  AWS_SECRET_ACCESS_KEY
   IMMICH_DB_PASSWORD
   IMMICH_API_KEY
   MLFLOW_TRACKING_URI
@@ -90,6 +92,11 @@ for ns in bestshot-platform bestshot-staging bestshot-canary bestshot-production
     --from-literal=BUCKET_NAME="${BUCKET_NAME}" \
     -n "${ns}" --dry-run=client -o yaml | kubectl apply -f -
 done
+
+kubectl create secret generic mlflow-artifact-credentials \
+  --from-literal=AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID}" \
+  --from-literal=AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY}" \
+  -n bestshot-platform --dry-run=client -o yaml | kubectl apply -f -
 
 kubectl create secret generic immich-db-secret \
   --from-literal=DB_PASSWORD="${IMMICH_DB_PASSWORD}" \
