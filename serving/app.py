@@ -182,6 +182,7 @@ def feedback(request: dict):
         }
 
     entry = {
+        "event_type": "user_feedback",
         "event_id":   f"evt_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}_{request.get('photo_id', '')}",
         "photo_id":   request.get("photo_id"),
         "asset_id":   request.get("asset_id"),
