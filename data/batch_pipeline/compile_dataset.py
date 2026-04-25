@@ -127,7 +127,7 @@ def candidate_selection(interactions, scores):
             latest_action = explicit_actions[-1]
             label = 'low' if latest_action['action'] == 'delete' else 'high'
             candidates.append({
-                'image_path': f'production/user_uploads/{latest_action["user_id"]}/{photo_id}',
+	        'image_path': f'production/user_uploads/immich/{photo_id}.jpg' if latest_action.get('user_id', '') in ('sidecar', '') else f'production/user_uploads/{latest_action["user_id"]}/{photo_id}', 
                 'quality_score': 2.0 if label == 'low' else 8.0,
                 'label': label,
                 'source': 'production',
