@@ -22,7 +22,6 @@ spec:
           - /bin/sh
           - -c
           - >
-            pip install --no-cache-dir psycopg2-binary boto3 &&
             mlflow server
             --backend-store-uri postgresql://user:password@postgres/mlflowdb
             --artifacts-destination s3://proj19-mlflow-artifacts/
