@@ -52,7 +52,7 @@ env:
 
 jobs:
 
-  # Six Images are built in parallel; GHA cache speeds repeat runs.
+  # Images are built in matrix; GHA cache speeds repeat runs.
 
   build-and-push:
 
@@ -112,6 +112,12 @@ jobs:
             context: ./data/generator
 
             file: ./data/generator/Dockerfile
+
+          - tag: mlflow
+
+            context: ./infra/mlflow
+
+            file: ./infra/mlflow/Dockerfile
 
 
 
