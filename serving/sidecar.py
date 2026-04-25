@@ -357,7 +357,7 @@ def group_bursts(assets_with_exif: list) -> dict:
         prev_ts = sortable[i-1][1]
         diff = abs((ts - prev_ts).total_seconds())
 
-        if diff <= 2.0:
+        if diff <= 4.0:
             current_group.append((asset, ts))
         else:
             if len(current_group) > 1:
@@ -500,10 +500,10 @@ def run():
             if burst_info:
                 decisions["is_burst"]       = True
                 decisions["burst_group_id"] = burst_info["burst_group_id"]
-                if not burst_info["is_burst_best"]:
-                    # only the best photo from the burst gets is_best_shot
-                    # but all can still be review candidates
-                    decisions["is_best_shot"] = False
+                 if burst_info["is_burst_best"]:
+                    decisions["is_best_shot"] = True   # always mark winner as best shot
+                else:
+                    decisions["is_best_shot"] = False  # suppress for non-winners
                 result["decisions"] = decisions
 
             # save score event to Swift
