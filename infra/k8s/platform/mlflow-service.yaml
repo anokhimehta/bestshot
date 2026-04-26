@@ -4,10 +4,8 @@ metadata:
   name: mlflow
   namespace: bestshot-platform
 spec:
-  selector:
-    app: mlflow
   type: NodePort
   ports:
-  - port: 5000
-    targetPort: 5000
+  - port: 8000
+    targetPort: 8000
     nodePort: 30500

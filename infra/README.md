@@ -6,6 +6,11 @@ Single-node Kubernetes cluster on Chameleon KVM@TACC.
 - Block storage volume for persistent data
 - Project suffix: proj19
 
+Production policy:
+- Use one production notebook: `serving/setup_node.ipynb`.
+- Use one production execution path: `bash infra/bootstrap.sh` + Kubernetes manifests in `infra/k8s/`.
+- Host-level Docker scripts are dev-only and should not be used for production rollout.
+
 ## Services
 | Service | URL | Port |
 |---|---|---|
@@ -106,3 +111,11 @@ kubectl create secret generic mlflow-artifact-credentials \
   --from-literal=AWS_ACCESS_KEY_ID=<s3_access_key> \
   --from-literal=AWS_SECRET_ACCESS_KEY=<s3_secret_key> \
   -n bestshot-platform
+
+`IMMICH_API_KEY` can be added after first bootstrap (once Immich UI is up):
+
+kubectl create secret generic immich-sidecar-secret \
+  --from-literal=IMMICH_API_KEY=<immich_api_key> \
+  -n bestshot-app --dry-run=client -o yaml | kubectl apply -f -
+
+kubectl rollout restart deployment/immich-sidecar -n bestshot-app

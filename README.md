@@ -11,6 +11,11 @@ This repository contains versioned code + infrastructure so the project can be r
 4. Run `bash infra/bootstrap.sh`.
 5. Verify pods and CronJobs.
 
+Production policy:
+- Kubernetes is the single production runtime.
+- `serving/setup_node.ipynb` is the single production notebook.
+- Host Docker flows (`serving/start.sh`, `serving/run.sh`, manual `docker run`) are dev-only.
+
 ```bash
 git clone https://github.com/anokhimehta/bestshot.git
 cd bestshot
@@ -23,7 +28,6 @@ export BUCKET_NAME="<swift_bucket>"
 export AWS_ACCESS_KEY_ID="<s3_access_key>"
 export AWS_SECRET_ACCESS_KEY="<s3_secret_key>"
 export IMMICH_DB_PASSWORD="<db_password>"
-export IMMICH_API_KEY="<immich_api_key>"
 export MLFLOW_TRACKING_URI="http://<FLOATING_IP>:30500"
 
 bash infra/bootstrap.sh
@@ -31,6 +35,15 @@ bash infra/bootstrap.sh
 kubectl get pods --all-namespaces
 kubectl get cronjobs -n bestshot-platform
 kubectl get pods -n bestshot-app
+```
+
+`IMMICH_API_KEY` is optional during first bootstrap. If omitted, create it after Immich is up:
+
+```bash
+kubectl create secret generic immich-sidecar-secret \
+  --from-literal=IMMICH_API_KEY="<immich_api_key>" \
+  -n bestshot-app --dry-run=client -o yaml | kubectl apply -f -
+kubectl rollout restart deployment/immich-sidecar -n bestshot-app
 ```
 
 ## Immich Sidecar Automation
@@ -82,7 +95,6 @@ export BUCKET_NAME="<swift_bucket>"
 export AWS_ACCESS_KEY_ID="<s3_access_key>"
 export AWS_SECRET_ACCESS_KEY="<s3_secret_key>"
 export IMMICH_DB_PASSWORD="<db_password>"
-export IMMICH_API_KEY="<immich_api_key>"
 export MLFLOW_TRACKING_URI="http://<CHI_TACC_IP>:30500"
 
 # 3) Re-apply everything
@@ -104,6 +116,13 @@ python data/generator/simulate_users.py
 - Retrain, promotion, and rollback run via Kubernetes CronJobs.
 - Model promotion gates on quality thresholds before Production transition.
 - Rollback checks production health and restores a previous model if needed.
+- Bootstrap (`infra/bootstrap.sh`) automates K3s setup, namespace/secret creation, and manifest apply.
+
+## Dev-only Paths (Not Production)
+
+- `serving/start.sh` and `serving/run.sh` are for local benchmarking/debug only.
+- `training/docker/docker-compose-mlflow.yaml` is for local experiments only.
+- Do not use host Docker services when validating production behavior.
 
 ## Detailed Docs
 

@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
       - name: mlflow
-        image: ghcr.io/anokhimehta/bestshot-mlflow:latest
+        image: ghcr.io/anokhimehta/bestshot-training:latest
         command:
           - /bin/sh
           - -c

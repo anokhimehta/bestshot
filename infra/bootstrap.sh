@@ -16,7 +16,6 @@ required_env=(
   AWS_ACCESS_KEY_ID
   AWS_SECRET_ACCESS_KEY
   IMMICH_DB_PASSWORD
-  IMMICH_API_KEY
   MLFLOW_TRACKING_URI
 )
 
@@ -27,6 +26,9 @@ for var in "${required_env[@]}"; do
 done
 
 info "All required environment variables are present"
+if [[ -z "${IMMICH_API_KEY:-}" ]]; then
+  warn "IMMICH_API_KEY not provided; skipping immich-sidecar-secret for now."
+fi
 
 if ! command -v kubectl >/dev/null 2>&1; then
   info "kubectl not found yet (expected before K3s install)"
@@ -104,9 +106,15 @@ kubectl create secret generic immich-db-secret \
   --from-literal=DB_DATABASE_NAME=immich \
   -n bestshot-app --dry-run=client -o yaml | kubectl apply -f -
 
-kubectl create secret generic immich-sidecar-secret \
-  --from-literal=IMMICH_API_KEY="${IMMICH_API_KEY}" \
-  -n bestshot-app --dry-run=client -o yaml | kubectl apply -f -
+if [[ -n "${IMMICH_API_KEY:-}" ]]; then
+  kubectl create secret generic immich-sidecar-secret \
+    --from-literal=IMMICH_API_KEY="${IMMICH_API_KEY}" \
+    -n bestshot-app --dry-run=client -o yaml | kubectl apply -f -
+else
+  warn "To add Immich API key later, run:"
+  warn "kubectl create secret generic immich-sidecar-secret --from-literal=IMMICH_API_KEY=\"<immich_api_key>\" -n bestshot-app --dry-run=client -o yaml | kubectl apply -f -"
+  warn "Then restart sidecar: kubectl rollout restart deployment/immich-sidecar -n bestshot-app"
+fi
 
 info "Deploying platform, app, environments, monitoring, and jobs"
 kubectl apply -f "${ROOT_DIR}/infra/k8s/platform/"

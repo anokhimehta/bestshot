@@ -359,7 +359,7 @@ jobs:
 
           kubectl apply -f infra/k8s/platform/
 
-          kubectl rollout status deployment/mlflow -n bestshot-platform --timeout=120s
+          kubectl rollout status deployment/mlflow -n bestshot-platform --timeout=300s
 
 
 
