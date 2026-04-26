@@ -77,6 +77,19 @@ def download_dataset(conn, local_dir):
             parts = obj['name'].split('/')
             if len(parts) >= 2 and parts[1].startswith('v'):
                 versions.add(int(parts[1][1:]))
+
+        #download latest versioned dataset if it exists
+        latest_version = f"v{max(versions)}"
+        labels_dir = local_dir / "labels" / latest_version
+        labels_dir.mkdir(parents=True, exist_ok=True)
+        for split in ['train', 'eval']:
+            csv_key = f'labels/{latest_version}/{split}.csv'
+            local_csv = labels_dir / f"{split}.csv"
+            if not local_csv.exists():
+                print(f"Downloading {csv_key} from object storage...")
+                _, content = conn.get_object(BUCKET, csv_key)
+                local_csv.write_bytes(content)
+                print(f"{csv_key} downloaded.")
         return f"v{max(versions)}" if versions else "koniq10k-only"
     except:
         return "koniq10k-only"
@@ -121,6 +134,36 @@ class KonIQDataset(Dataset):
         score = torch.tensor(self.scores[idx], dtype=torch.float32)
         return image, score
 
+class VersionedDataset(Dataset):
+    """
+    Loads from a versioned labels/vN/train.csv produced by compile_dataset.py.
+    Includes user feedback-labeled production images merged with KonIQ-10k.
+    """
+    def __init__(self, data_dir, version, split='train', transform=None):
+        data_dir = Path(data_dir)
+        csv_path = data_dir / "labels" / f"v{version}" / f"{split}.csv"
+        if not csv_path.exists():
+            raise FileNotFoundError(f"Versioned dataset not found at {csv_path}")
+        df = pd.read_csv(csv_path)
+        # All images stored flat under 512x384/ regardless of source
+        self.image_paths = [data_dir / "512x384" / Path(p).name for p in df["image_path"]]
+        self.scores = df["quality_score"].tolist()
+        self.transform = transform
+        print(f"VersionedDataset v{version} ({split}): {len(self.scores)} samples loaded")
+
+
+    def __len__(self):
+        return len(self.image_paths)
+
+    def __getitem__(self, idx):
+        try:
+            image = Image.open(self.image_paths[idx]).convert("RGB")
+        except Exception:
+            image = Image.fromarray(np.zeros((300, 300, 3), dtype=np.uint8))
+        if self.transform:
+            image = self.transform(image)
+        score = torch.tensor(self.scores[idx], dtype=torch.float32)
+        return image, score
 
 #2. Model definition (e.g., ResNet, ViT)
 class BestShotModel(L.LightningModule):
@@ -180,7 +223,20 @@ def main(config):
     ])
 
     # Load dataset
-    dataset = KonIQDataset(config['data_dir'], transform=transform)
+    if dataset_version and dataset_version != "koniq10k-only":
+        try:
+            dataset = VersionedDataset(
+                config['data_dir'], 
+                version=dataset_version.lstrip('v'), 
+                split='train', 
+                transform=transform
+            )
+        except FileNotFoundError as e:
+            print(f"Versioned dataset not found: {e}. Falling back to KonIQDataset.")
+            dataset = KonIQDataset(config['data_dir'], transform=transform)
+    else:
+        dataset = KonIQDataset(config['data_dir'], transform=transform)
+
     if config.get('limit'):
         dataset = torch.utils.data.Subset(dataset, range(config['limit']))
     n = len(dataset)
@@ -222,7 +278,7 @@ def main(config):
         eval_results = evaluate(
             model_uri=f"runs:/{mlflow.active_run().info.run_id}/model",
             data_dir=config['data_dir'],
-            dataset_version=config.get('dataset_version', None)
+            dataset_version=dataset_version if dataset_version != 'koniq10k-only' else None
         )
         mlflow.log_metric("plcc", eval_results["plcc"])
         mlflow.log_metric("srcc", eval_results["srcc"])
