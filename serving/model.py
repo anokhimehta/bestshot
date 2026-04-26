@@ -25,10 +25,7 @@ class Model:
 
     def _init_pytorch(self):
         mlflow.set_tracking_uri(
-            os.getenv(
-                "MLFLOW_TRACKING_URI",
-                "http://mlflow.bestshot-platform.svc.cluster.local:5000"
-            )
+            os.getenv("MLFLOW_TRACKING_URI","http://mlflow.bestshot-platform.svc.cluster.local:5000")
         )
 
         from mlflow.tracking import MlflowClient
@@ -41,7 +38,7 @@ class Model:
         load_uri = None
         version = None
         try:
-            version = client.get_model_version_by_alias(model_name, alias)
+            version = client.get_model_version_by_alias(model_name, alias) # first try to get version by alias (e.g. "production" or "staging")
             load_uri = f"models:/{model_name}@{alias}"
             print(
                 f"Loading model: {model_name} alias={alias} "
@@ -61,7 +58,7 @@ class Model:
                     f"No registered versions for {model_name} and alias {alias!r} missing. "
                     "Set MLFLOW_MODEL_ALIAS to an existing alias or register the model in MLflow."
                 ) from e
-            version = max(mvs, key=lambda v: int(v.version))
+            version = max(mvs, key=lambda v: int(v.version)) # fallback to latest version if alias not found
             load_uri = f"models:/{model_name}/{version.version}"
             print(
                 f"Loading model: {model_name} version {version.version} "
@@ -84,8 +81,6 @@ class Model:
 
         self.model.to(self.device)
         print(f"CUDA available: {torch.cuda.is_available()}")
-        #print(f"ROCm version: {torch.version.hip if hasattr(torch, 'version') and hasattr(torch.version, 'hip') else 'N/A'}")
-        #print(f"ROCm available: {torch.hip.is_available()}")
         print(f"Selected device: {self.device}")
         print(f"Model device: {next(self.model.parameters()).device}")
         print(f"Loaded real model v{version.version} on: {self.device}")
@@ -240,7 +235,6 @@ class Model:
                 "is_burst":      False,
                 "burst_group_id": None
             }
-            print("Input device:", x_gpu.device) # TESTING LINE
             results.append({"scores": scores, "decisions": decisions})
         return results
 

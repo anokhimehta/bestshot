@@ -164,7 +164,7 @@ def predict(request: dict):
 def feedback(request: dict):
     prediction = request.get("prediction", {})
     action     = request.get("action")
-    feature    = request.get("feature")  # "best_shot" or "deletion_suggestion"
+    feature    = request.get("feature")  # best_shot or deletion_suggestion
 
     valid_actions  = {"keep", "delete", "favorite"}
     valid_features = {"best_shot", "deletion_suggestion"}
