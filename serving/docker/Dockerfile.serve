@@ -34,7 +34,6 @@ COPY model.py .
 COPY benchmark.py .
 COPY testing_example_input.json .
 COPY config.py .
-COPY model.onnx .
 COPY images/ ./images/
 COPY configs/ ./configs/
 COPY sidecar.py .
