@@ -19,7 +19,7 @@ N_REQUESTS = N_USERS * UPLOADS_PER_USER
 
 start_total = time.time()
 
-# functions to run benchmarks in different modes -------------------------------------------------------------------
+# functions to run benchmarks in different modes
 
 def run_sequential(n_requests): # multiple users sending requests one after another
     latencies = []
@@ -71,7 +71,7 @@ def run_concurrent(num_users, uploads_per_user): # multiple users sending reques
 
     return all_latencies, all_results
 
-# run the right mode based on config -------------------------------------------------------------------
+# run the right mode based on config 
 
 if MAX_WORKERS == 1:
     print(f"Running sequential benchmark ({N_REQUESTS} total requests)...")
@@ -82,7 +82,7 @@ else:
 
 total_time = time.time() - start_total
 
-# compute metrics ------------------------------------------------------------------------------------
+# compute metrics 
 
 flattened_results = [img for batch in all_results for img in batch]
 
@@ -104,7 +104,7 @@ else:
 
     avg_metrics = {k: v / len(flattened_results) for k, v in metric_sums.items()}
 
-# save results to a text file for later analysis -----------------------------------------------------------
+# save results to a text file for later analysis 
 
     with open("benchmark_results.txt", "w") as f:
         f.write(f"------ Benchmark results for config: {CONFIG['mode']} ------\n")
@@ -120,7 +120,7 @@ else:
         for metric, value in avg_metrics.items():
             f.write(f"  {metric}: {value:.3f}\n")
 
-# print results to terminal output -----------------------------------------------------------------------
+# print results to terminal output
 
     print("\nBenchmark finished!")
     print(f"Config: {CONFIG['mode']} | Workers: {MAX_WORKERS}")

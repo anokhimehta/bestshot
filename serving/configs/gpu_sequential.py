@@ -1,3 +1,5 @@
+# Configuration for GPU sequential processing
+# This config simulates 100 users uploading 20 images each sequentially (total 2000 requests) to test the trained model's performance on GPU without batching.
 CONFIG = {
     "mode": "gpu_sequential",
     "device": "gpu",

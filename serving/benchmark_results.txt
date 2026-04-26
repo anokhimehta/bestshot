@@ -1,9 +1,0 @@
-Benchmark Results with untrained model
-Sent 20 requests with 7 images each
-Average latency per request: 790.70 ms
-Throughput: 1.26 req/sec
-Average metrics per image:
-  koniq_score: 0.757
-  sharpness: 0.746
-  exposure: 0.759
-  face_quality: 0.734
