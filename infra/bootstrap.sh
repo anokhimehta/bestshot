@@ -84,6 +84,15 @@ for ns in bestshot-platform bestshot-app bestshot-staging bestshot-canary bestsh
     -n "${ns}" --dry-run=client -o yaml | kubectl apply -f -
 done
 
+# Serving pods should use in-cluster MLflow by default so they don't depend on
+# node/floating-IP routing from the pod network.
+MLFLOW_TRACKING_URI_SERVING="${MLFLOW_TRACKING_URI_SERVING:-http://mlflow.bestshot-platform.svc.cluster.local:8000}"
+for ns in bestshot-staging bestshot-canary bestshot-production; do
+  kubectl create secret generic mlflow-credentials \
+    --from-literal=MLFLOW_TRACKING_URI="${MLFLOW_TRACKING_URI_SERVING}" \
+    -n "${ns}" --dry-run=client -o yaml | kubectl apply -f -
+done
+
 for ns in bestshot-platform bestshot-staging bestshot-canary bestshot-production; do
   kubectl create secret generic openstack-credentials \
     --from-literal=OS_AUTH_URL="${OS_AUTH_URL}" \

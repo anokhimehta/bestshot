@@ -32,10 +32,11 @@ metadata:
 spec:
   schedule: "*/5 * * * *"
   concurrencyPolicy: Forbid
-  successfulJobsHistoryLimit: 5
-  failedJobsHistoryLimit: 5
+  successfulJobsHistoryLimit: 2
+  failedJobsHistoryLimit: 1
   jobTemplate:
     spec:
+      backoffLimit: 0
       template:
         spec:
           containers:
@@ -57,10 +58,12 @@ spec:
               import datetime
               import sys
 
-              timestamp = datetime.datetime.utcnow().isoformat()
+              timestamp = datetime.datetime.now(datetime.UTC).isoformat()
 
               services = [
-                  ("MLflow",      "http://mlflow.bestshot-platform.svc.cluster.local:5000/health"),
+                  # MLflow service is exposed on 8000; use ClusterIP to avoid
+                  # transient cluster DNS failures impacting this check.
+                  ("MLflow",      "http://mlflow.bestshot-platform.svc.cluster.local:5000/"),
                   ("Immich",      "http://immich-server.bestshot-app.svc.cluster.local:2283/api/server/ping"),
                   ("Serving-STG", "http://bestshot-serving-staging.bestshot-staging.svc.cluster.local:8000/health"),
                   ("Serving-PRD", "http://bestshot-serving-production.bestshot-production.svc.cluster.local:8000/health"),

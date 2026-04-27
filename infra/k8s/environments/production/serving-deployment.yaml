@@ -47,17 +47,25 @@ spec:
           limits:
             cpu: "2000m"
             memory: "4Gi"
+        startupProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          # Allow slow model/bootstrap startup before liveness kicks in.
+          initialDelaySeconds: 20
+          periodSeconds: 10
+          failureThreshold: 60
         livenessProbe:
           httpGet:
             path: /health
             port: 8000
-          initialDelaySeconds: 30
+          initialDelaySeconds: 180
           periodSeconds: 30
         readinessProbe:
           httpGet:
             path: /health
             port: 8000
-          initialDelaySeconds: 15
+          initialDelaySeconds: 60
           periodSeconds: 10
 ---
 apiVersion: v1
