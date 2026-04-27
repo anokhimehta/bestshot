@@ -15,6 +15,12 @@ spec:
       labels:
         app: mlflow
     spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      hostAliases:
+      - ip: "129.114.97.101"
+        hostnames:
+        - chi.tacc.chameleoncloud.org
       containers:
       - name: mlflow
         image: ghcr.io/anokhimehta/bestshot-mlflow:latest
@@ -28,9 +34,12 @@ spec:
             --serve-artifacts
             --host 0.0.0.0
             --port 5000
+            --gunicorn-opts "--workers 1 --timeout 300"
         env:
         - name: MLFLOW_S3_ENDPOINT_URL
           value: https://chi.tacc.chameleoncloud.org:7480
+        - name: GUNICORN_CMD_ARGS
+          value: --workers 1 --timeout 300
         envFrom:
         - secretRef:
             name: mlflow-artifact-credentials
@@ -38,8 +47,8 @@ spec:
         - containerPort: 5000
         resources:
           requests:
-            cpu: "250m"
-            memory: "512Mi"
-          limits:
             cpu: "1000m"
             memory: "2Gi"
+          limits:
+            cpu: "1000m"
+            memory: "8Gi"
