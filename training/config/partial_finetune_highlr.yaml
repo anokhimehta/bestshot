@@ -1,8 +1,8 @@
 experiment_name: "partial-finetune-highlr-bestshot-iqa"
 data_dir: /data/koniq10k
-batch_size: 32
-epochs: 5
+batch_size: 4
+epochs: 1
 lr: 0.001
 seed: 42
-num_workers: 4
+num_workers: 0
 frozen_stages: 5

@@ -24,6 +24,10 @@ from dotenv import load_dotenv
 import os
 
 BUCKET = 'ak12754-data-proj19'
+LOCAL_PRETRAINED_WEIGHTS = os.getenv(
+    "BESTSHOT_PRETRAINED_WEIGHTS",
+    "/opt/model-weights/model.safetensors",
+)
 
 """
 BestShot train.py
@@ -170,7 +174,30 @@ class BestShotModel(L.LightningModule):
     def __init__(self, config):
         super().__init__()
         self.config = config
-        self.backbone = timm.create_model('efficientnet_b3', pretrained=True, num_classes=0)
+        use_pretrained = bool(config.get("pretrained", True))
+        try:
+            pretrained_cfg_overlay = None
+            if use_pretrained and os.path.exists(LOCAL_PRETRAINED_WEIGHTS):
+                print(f"Loading pretrained weights from local file: {LOCAL_PRETRAINED_WEIGHTS}")
+                pretrained_cfg_overlay = {"file": LOCAL_PRETRAINED_WEIGHTS}
+            elif use_pretrained:
+                print(
+                    "Local pretrained weights not found; "
+                    "falling back to default timm pretrained resolver."
+                )
+            self.backbone = timm.create_model(
+                'efficientnet_b3',
+                pretrained=use_pretrained,
+                num_classes=0,
+                pretrained_cfg_overlay=pretrained_cfg_overlay,
+            )
+        except Exception as e:
+            print(f"Falling back to pretrained=False due to backbone load error: {e}")
+            self.backbone = timm.create_model(
+                'efficientnet_b3',
+                pretrained=False,
+                num_classes=0,
+            )
         
         # Freeze early stages based on config
         frozen_stages = config.get('frozen_stages', 0)

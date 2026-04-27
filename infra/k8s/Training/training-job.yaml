@@ -12,13 +12,52 @@ spec:
     spec:
       template:
         spec:
+          hostNetwork: true
+          dnsPolicy: ClusterFirstWithHostNet
+          hostAliases:
+          - ip: "129.114.97.101"
+            hostnames:
+            - chi.tacc.chameleoncloud.org
           containers:
           - name: training
             image: ghcr.io/anokhimehta/bestshot-training:latest
+            imagePullPolicy: IfNotPresent
             command: ["python", "training/train.py", "--config", "training/config/partial_finetune_highlr.yaml"]
+            env:
+            - name: PYTORCH_NO_HIP_MEMORY_CACHING
+              value: "1"
+            - name: HSA_DISABLE_FRAGMENT_ALLOCATOR
+              value: "1"
+            - name: AMD_SERIALIZE_KERNEL
+              value: "3"
+            - name: AMD_SERIALIZE_COPY
+              value: "3"
             envFrom:
             - secretRef:
                 name: openstack-credentials
             - secretRef:
                 name: mlflow-credentials
+            resources:
+              requests:
+                cpu: "1000m"
+                memory: "2Gi"
+                amd.com/gpu: "1"
+              limits:
+                cpu: "2000m"
+                memory: "3Gi"
+                amd.com/gpu: "1"
+            volumeMounts:
+            - name: training-script
+              mountPath: /app/training/train.py
+              subPath: train.py
+            - name: training-config
+              mountPath: /app/training/config/partial_finetune_highlr.yaml
+              subPath: partial_finetune_highlr.yaml
           restartPolicy: Never
+          volumes:
+          - name: training-script
+            configMap:
+              name: bestshot-training-script
+          - name: training-config
+            configMap:
+              name: bestshot-training-config
