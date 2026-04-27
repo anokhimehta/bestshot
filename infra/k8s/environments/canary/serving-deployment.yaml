@@ -32,7 +32,7 @@ spec:
         - name: MLFLOW_MODEL_ALIAS
           value: "production"
         - name: DEVICE
-          value: "cpu"
+          value: "cuda"
         envFrom:
         - secretRef:
             name: mlflow-credentials
@@ -44,9 +44,11 @@ spec:
           requests:
             cpu: "500m"
             memory: "1Gi"
+            amd.com/gpu: "1"
           limits:
             cpu: "2000m"
             memory: "4Gi"
+            amd.com/gpu: "1"
         startupProbe:
           httpGet:
             path: /health
