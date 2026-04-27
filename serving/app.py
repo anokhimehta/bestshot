@@ -106,7 +106,8 @@ def append_to_interactions_log(conn, entry: dict):
     new_line = json.dumps(entry) + "\n"
     try:
         _, content = conn.get_object(BUCKET_NAME, INTERACTIONS_KEY)
-        updated = content.decode() + new_line
+        existing_text = content.decode("utf-8") if isinstance(content, (bytes, bytearray)) else str(content)
+        updated = existing_text + new_line
     except swiftclient.exceptions.ClientException as e:
         if "404" in str(e) or "Not Found" in str(e):
             print("[feedback] interactions_log.jsonl not found, creating new file")
@@ -117,7 +118,7 @@ def append_to_interactions_log(conn, entry: dict):
     conn.put_object(
         BUCKET_NAME,
         INTERACTIONS_KEY,
-        updated,
+        updated.encode("utf-8"),
         content_type="application/json"
     )
 

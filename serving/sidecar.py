@@ -26,12 +26,24 @@ import swiftclient
 from datetime import datetime, timezone
 from datetime import timedelta
 
+# helpers
+def _ensure_bytes(value):
+    if isinstance(value, bytes):
+        return value
+    if isinstance(value, bytearray):
+        return bytes(value)
+    if isinstance(value, str):
+        return value.encode("utf-8")
+    return str(value).encode("utf-8")
+
 # Config from env 
 
 IMMICH_URL    = os.getenv("IMMICH_URL", "http://localhost:2283").rstrip("/")
 IMMICH_KEY    = os.getenv("IMMICH_API_KEY")
 SERVING_URL   = os.getenv("SERVING_URL", "http://localhost:8000").rstrip("/")
 POLL_INTERVAL = int(os.getenv("POLL_INTERVAL", "30"))
+REQUEST_TIMEOUT = int(os.getenv("REQUEST_TIMEOUT", "20"))
+PREDICT_TIMEOUT = int(os.getenv("PREDICT_TIMEOUT", "120"))
 BUCKET        = os.getenv("BUCKET_NAME", "ak12754-data-proj19")
 
 if not IMMICH_KEY:
@@ -80,10 +92,16 @@ def save_score_event(asset_id: str, result: dict):
         new_line = json.dumps(entry) + "\n"
         try:
             _, content = swift_conn.get_object(BUCKET, "interactions_log.jsonl")
-            updated = content.decode() + new_line
+            existing_text = content.decode("utf-8") if isinstance(content, (bytes, bytearray)) else str(content)
+            updated = existing_text + new_line
         except Exception:
             updated = new_line
-        swift_conn.put_object(BUCKET, "interactions_log.jsonl", updated, content_type="application/json")
+        swift_conn.put_object(
+            BUCKET,
+            "interactions_log.jsonl",
+            _ensure_bytes(updated),
+            content_type="application/json",
+        )
         print(f"[sidecar] Saved score event for {asset_id}")
     except Exception as e:
         print(f"[sidecar] Failed to save score event: {e}")
@@ -96,7 +114,8 @@ def load_scores_from_log() -> dict:
         return scores
     try:
         _, content = swift_conn.get_object(BUCKET, "interactions_log.jsonl")
-        for line in content.decode().strip().split("\n"):
+        text = content.decode("utf-8") if isinstance(content, (bytes, bytearray)) else str(content)
+        for line in text.strip().split("\n"):
             if not line:
                 continue
             entry = json.loads(line)
@@ -115,7 +134,7 @@ def load_scores_from_log() -> dict:
 
 def get_or_create_album(name: str) -> str:
     """Get album ID by name, or create it if it doesn't exist."""
-    resp = requests.get(f"{IMMICH_URL}/api/albums", headers=HEADERS)
+    resp = requests.get(f"{IMMICH_URL}/api/albums", headers=HEADERS, timeout=REQUEST_TIMEOUT)
     if resp.status_code != 200:
         print(f"[sidecar] Failed to list albums: {resp.status_code}")
         return None
@@ -129,7 +148,8 @@ def get_or_create_album(name: str) -> str:
     resp = requests.post(
         f"{IMMICH_URL}/api/albums",
         headers=HEADERS,
-        json={"albumName": name}
+        json={"albumName": name},
+        timeout=REQUEST_TIMEOUT,
     )
     if resp.status_code in (200, 201):
         album_id = resp.json()["id"]
@@ -143,7 +163,8 @@ def get_asset_exif(asset_id: str) -> dict:
     """Get EXIF data for an asset."""
     resp = requests.get(
         f"{IMMICH_URL}/api/assets/{asset_id}",
-        headers=HEADERS
+        headers=HEADERS,
+        timeout=REQUEST_TIMEOUT,
     )
     if resp.status_code == 200:
         return resp.json().get("exifInfo", {})
@@ -158,7 +179,8 @@ def get_new_assets(since: str) -> list:
             "updatedAfter": since,
             "type": "IMAGE",
             "withExif": False
-        }
+        },
+        timeout=REQUEST_TIMEOUT,
     )
     if resp.status_code != 200:
         print(f"[sidecar] Failed to search assets: {resp.status_code} {resp.text}")
@@ -173,7 +195,8 @@ def download_image(asset_id: str) -> bytes:
     """Download original image bytes from Immich."""
     resp = requests.get(
         f"{IMMICH_URL}/api/assets/{asset_id}/original",
-        headers=HEADERS
+        headers=HEADERS,
+        timeout=REQUEST_TIMEOUT,
     )
     if resp.status_code == 200:
         return resp.content
@@ -187,7 +210,7 @@ def save_to_object_storage(asset_id: str, image_bytes: bytes):
         return
     try:
         storage_path = f'production/user_uploads/immich/{asset_id}.jpg'
-        swift_conn.put_object(BUCKET, storage_path, image_bytes)
+        swift_conn.put_object(BUCKET, storage_path, _ensure_bytes(image_bytes))
         print(f"[sidecar] Saved {asset_id} to object storage: {storage_path}")
     except Exception as e:
         print(f"[sidecar] Failed to save {asset_id} to object storage: {e}")
@@ -211,7 +234,8 @@ def write_score_to_immich(asset_id: str, result: dict):
     resp = requests.put(
         f"{IMMICH_URL}/api/assets/{asset_id}",
         headers=HEADERS,
-        json={"description": desc}
+        json={"description": desc},
+        timeout=REQUEST_TIMEOUT,
     )
     if resp.status_code == 200:
         print(f"[sidecar] Wrote score to {asset_id}: {desc}")
@@ -226,7 +250,8 @@ def add_to_album(asset_id: str, album_id: str):
     resp = requests.put(
         f"{IMMICH_URL}/api/albums/{album_id}/assets",
         headers=HEADERS,
-        json={"ids": [asset_id]}
+        json={"ids": [asset_id]},
+        timeout=REQUEST_TIMEOUT,
     )
     if resp.status_code == 200:
         print(f"[sidecar] Added {asset_id} to album {album_id}")
@@ -240,7 +265,8 @@ def get_album_assets(album_id: str) -> set:
         return set()
     resp = requests.get(
         f"{IMMICH_URL}/api/albums/{album_id}",
-        headers=HEADERS
+        headers=HEADERS,
+        timeout=REQUEST_TIMEOUT,
     )
     if resp.status_code == 200:
         assets = resp.json().get("assets", [])
@@ -291,7 +317,8 @@ def is_favorited(asset_id: str) -> bool:
     try:
         resp = requests.get(
             f"{IMMICH_URL}/api/assets/{asset_id}",
-            headers=HEADERS
+            headers=HEADERS,
+            timeout=REQUEST_TIMEOUT,
         )
         if resp.status_code == 200:
             return resp.json().get("isFavorite", False)
@@ -317,7 +344,8 @@ def score_image(asset_id: str, image_bytes: bytes) -> dict:
                 "image_path":  "",
                 "metadata":    {}
             }]
-        }
+        },
+        timeout=PREDICT_TIMEOUT,
     )
 
     if resp.status_code != 200:
@@ -400,7 +428,7 @@ def run():
             time.sleep(5)
 
     # verify Immich connection
-    immich_ping = requests.get(f"{IMMICH_URL}/api/server/ping", headers=HEADERS)
+    immich_ping = requests.get(f"{IMMICH_URL}/api/server/ping", headers=HEADERS, timeout=REQUEST_TIMEOUT)
     if immich_ping.status_code != 200:
         print(f"[sidecar] WARNING: Immich not reachable: {immich_ping.status_code}")
     else:
@@ -413,7 +441,10 @@ def run():
     processed_ids   = set()
     album_snapshots = {"best_shot": {}, "deletion_suggestion": {}}
     favorited_ids   = set()
-    last_check      = datetime.now(timezone.utc).isoformat()
+    # Look back a bit on startup so we do not miss recent uploads
+    # if sidecar restarts between polling windows.
+    lookback_minutes = int(os.getenv("POLL_LOOKBACK_MINUTES", "180"))
+    last_check = (datetime.now(timezone.utc) - timedelta(minutes=lookback_minutes)).isoformat()
 
     saved_scores = load_scores_from_log()
 
@@ -500,7 +531,7 @@ def run():
             if burst_info:
                 decisions["is_burst"]       = True
                 decisions["burst_group_id"] = burst_info["burst_group_id"]
-                 if burst_info["is_burst_best"]:
+                if burst_info["is_burst_best"]:
                     decisions["is_best_shot"] = True   # always mark winner as best shot
                 else:
                     decisions["is_best_shot"] = False  # suppress for non-winners

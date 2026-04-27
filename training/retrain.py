@@ -118,7 +118,7 @@ def get_negative_feedback_rate(interactions, since):
     for e in feedback:
         feature = e['feature']
         action = e['action']
-        if feature == 'delete_suggestion' and action in ('keep', 'favorite'):
+        if feature == 'deletion_suggestion' and action in ('keep', 'favorite'):
             negative.append(e)
         elif feature == 'best_shot' and action == 'delete':
             negative.append(e)

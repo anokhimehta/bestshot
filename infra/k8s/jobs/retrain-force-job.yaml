@@ -1,0 +1,32 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: retrain-force-manual
+  namespace: bestshot-platform
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      hostAliases:
+      - ip: "129.114.97.101"
+        hostnames:
+        - chi.tacc.chameleoncloud.org
+      containers:
+      - name: retrain
+        image: ghcr.io/anokhimehta/bestshot-training:latest
+        command: ["python", "training/retrain.py", "--force"]
+        envFrom:
+        - secretRef:
+            name: openstack-credentials
+        - secretRef:
+            name: mlflow-credentials
+        resources:
+          requests:
+            cpu: "500m"
+            memory: "1Gi"
+          limits:
+            cpu: "1000m"
+            memory: "2Gi"
+      restartPolicy: Never

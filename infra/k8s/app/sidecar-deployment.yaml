@@ -5,6 +5,8 @@ metadata:
   namespace: bestshot-app
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: bestshot-sidecar
@@ -13,9 +15,15 @@ spec:
       labels:
         app: bestshot-sidecar
     spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      hostAliases:
+      - ip: "129.114.97.101"
+        hostnames:
+        - chi.tacc.chameleoncloud.org
       containers:
       - name: sidecar
-        image: ghcr.io/anokhimehta/bestshot-serving:latest
+        image: ghcr.io/anokhimehta/bestshot-serving@sha256:3989a93fce2c8303f303e963e0d4e8ccbb53a6cf723464065408b28f4f583521
         command: ["python", "-u", "sidecar.py"]
         env:
         - name: IMMICH_URL
@@ -24,9 +32,19 @@ spec:
           value: "http://bestshot-serving-production.bestshot-production.svc.cluster.local:8000"
         - name: POLL_INTERVAL
           value: "30"
+        - name: POLL_LOOKBACK_MINUTES
+          value: "5"
+        - name: PREDICT_TIMEOUT
+          value: "120"
         envFrom:
         - secretRef:
             name: immich-sidecar-secret
+        - secretRef:
+            name: openstack-credentials
+        volumeMounts:
+        - name: sidecar-script
+          mountPath: /app/sidecar.py
+          subPath: sidecar.py
         resources:
           requests:
             cpu: "100m"
@@ -34,3 +52,7 @@ spec:
           limits:
             cpu: "500m"
             memory: "1Gi"
+      volumes:
+      - name: sidecar-script
+        configMap:
+          name: bestshot-sidecar-script
