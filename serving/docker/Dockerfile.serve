@@ -7,7 +7,8 @@ RUN pip install --no-cache-dir --upgrade pip setuptools wheel
 # Keep torch/torchvision from the ROCm base image to avoid CI wheel resolution failures.
 RUN python -c "import torch, torchvision; print('torch', torch.__version__, 'torchvision', torchvision.__version__)"
 
-# Install generic Python dependencies.
+# Install generic Python dependencies (do not pull timm/lightning with deps — they can
+# replace the ROCm base image's torch with a CUDA+NVIDIA wheel from PyPI).
 RUN pip install --no-cache-dir \
     fastapi \
     uvicorn \
@@ -20,13 +21,18 @@ RUN pip install --no-cache-dir \
     python-dotenv \
     prometheus-fastapi-instrumentator \
     prometheus-client \
-    timm \
     opencv-python-headless \
-    mlflow \
-    lightning
+    mlflow
+
+RUN pip install --no-cache-dir timm --no-deps
+
+RUN pip install --no-cache-dir lightning --no-deps torchmetrics lightning-utilities
 
 # Prefer ROCm runtime, but fall back to CPU runtime if wheel is unavailable.
 RUN pip install --no-cache-dir onnxruntime-rocm || pip install --no-cache-dir onnxruntime
+
+# Fail the image build if PyPI replaced ROCm torch with a CUDA wheel (+cu*). Caught by CI on every serving build.
+RUN python -c "import torch, torchvision; v=(torch.__version__ or '').lower(); assert '+cu' not in v, 'CUDA-only PyTorch wheel in image: ' + torch.__version__; print('torch ok:', torch.__version__, 'torchvision:', torchvision.__version__)"
 
 COPY app.py .
 COPY model.py .

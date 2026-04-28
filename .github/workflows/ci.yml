@@ -179,6 +179,9 @@ jobs:
 
 
 
+      # bestshot-serving: ROCm torch must not be replaced by a PyPI CUDA wheel; enforced in
+      # serving/docker/Dockerfile.serve (pip timm/lightning --no-deps + RUN python … '+cu' check).
+
       - name: Build and push ${{ matrix.tag }}
 
         uses: docker/build-push-action@v5
