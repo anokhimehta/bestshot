@@ -130,6 +130,13 @@ python data/generator/simulate_users.py
 - CI/CD behavior, deploy tunnel secrets, and skip options: `docs/cicd.md`
 - Recovery checklist and rerun commands: `docs/runbook.md`
 
+## Forced Training Trigger
+- docker run --rm \
+  --network host \
+  --env-file ~/bestshot/.env \
+  ghcr.io/anokhimehta/bestshot-training:latest \
+  python training/train.py --config training/config/partial_finetune_highlr.yaml
+
 ## Notes For Grading
 
 - All operational assets are in Git (code, manifests, scripts, workflow).
