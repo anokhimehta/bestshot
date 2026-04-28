@@ -33,13 +33,13 @@ spec:
             --artifacts-destination s3://proj19-mlflow-artifacts/
             --serve-artifacts
             --host 0.0.0.0
+            --allowed-hosts "*"
+            --cors-allowed-origins "*"
             --port 5000
-            --gunicorn-opts "--workers 1 --timeout 300"
+            --uvicorn-opts "--workers 1 --timeout-keep-alive 300"
         env:
         - name: MLFLOW_S3_ENDPOINT_URL
           value: https://chi.tacc.chameleoncloud.org:7480
-        - name: GUNICORN_CMD_ARGS
-          value: --workers 1 --timeout 300
         envFrom:
         - secretRef:
             name: mlflow-artifact-credentials

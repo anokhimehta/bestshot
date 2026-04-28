@@ -1,4 +1,4 @@
-FROM ghcr.io/mlflow/mlflow:v2.10.0
+FROM ghcr.io/mlflow/mlflow:v3.11.1
 
 # Include DB and S3 client dependencies at build time so pods do not need
 # outbound internet access during startup.
